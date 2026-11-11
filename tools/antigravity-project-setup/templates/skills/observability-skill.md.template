@@ -1,0 +1,30 @@
+---
+name: observability-skill
+description: "Set up logs, metrics, traces, crash/error reporting, health checks, and post-deploy monitoring for {{PROJECT_NAME}}."
+---
+
+# Observability Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** を、リリース後に壊れたことへ気づける状態にするための Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Frameworks**: {{FRAMEWORKS}}
+- **Deploy Environment**: {{DEPLOY_ENV}}
+
+## 手順
+1. **監視対象を決める**
+   - Web: route errors, API latency, Core Web Vitals, server logs, deploy status.
+   - Native: crash rate, ANR/hangs, startup time, network failures.
+   - Game: FPS, asset load failures, scene transition errors, save/load failures.
+2. **ツール採否を判断する**
+   - Sentry, Firebase Crashlytics, Vercel Analytics, OpenTelemetry, Cloud Logging などを公式docs確認後に `required / conditional / rejected` へ分類する。
+3. **イベントとログを設計する**
+   - ログレベル、request id/session id、PIIマスク、エラー境界、ユーザー行動イベントを最小十分に定義する。
+4. **ヘルスチェックを用意する**
+   - DB接続、外部API、build revision、主要ページ/API の smoke test を用意する。
+
+## 完了条件
+- エラー収集、ログ、メトリクス、ヘルスチェックの採否と理由がある。
+- 秘密情報や個人情報をログに出さない方針が記録されている。
+- デプロイ後に確認する smoke/monitoring 手順がある。

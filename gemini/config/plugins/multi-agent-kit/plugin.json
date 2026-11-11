@@ -1,0 +1,16 @@
+{
+  "name": "multi-agent-kit",
+  "displayName": "Multi-Agent Opinion Kit (15+3体 複眼監査 & PDCA)",
+  "version": "1.2.0",
+  "description": "監査独立性規律 (§3)、15体の単一責任専門レビュアー＋3体の複眼複合監査による3-Strike PDCAパイプライン (multi-agent-opinion)、固着打破の事実観察 (mindfulness)、視覚ゼロトレランス検証 (visual-verification-loop) を提供します。",
+  "author": {
+    "name": "Haratakeshi",
+    "url": "https://github.com/Haratakeshi"
+  },
+  "repository": "https://github.com/Haratakeshi/antigravity-multiagent-setup-ja",
+  "suggestedPrompts": [
+    "multi-agent-opinion (モードA) で現在の実装差分に対して15+3体のクリーンルーム監査を実行して",
+    "multi-agent-opinion (モードC) でこの設計ドラフトの前提を敵対的に反証して",
+    "visual-verification-loop で現在の画面スクリーンショットが合格基準を満たすか検証して"
+  ]
+}

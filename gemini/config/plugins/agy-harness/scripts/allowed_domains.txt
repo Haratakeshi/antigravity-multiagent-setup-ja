@@ -1,0 +1,48 @@
+# agy-harness 信頼境界: サフィックス一致で許可するドメイン
+# 1行1ドメイン。サブドメインも許可される。
+# ここにないドメインは deny ではなく「ask」(その場で承認可能・Always Allow キャッシュ有効)
+
+# Antigravity / Google 公式
+antigravity.google
+google.com
+googleapis.com
+googlesource.com
+developers.google.com
+cloud.google.com
+ai.google.dev
+codelabs.developers.google.com
+
+# コードホスティング (公式リポジトリ)
+github.com
+githubusercontent.com
+gitlab.com
+
+# 言語・ランタイム公式
+docs.python.org
+python.org
+nodejs.org
+typescriptlang.org
+developer.mozilla.org
+learn.microsoft.com
+microsoft.com
+rust-lang.org
+docs.rs
+go.dev
+
+# パッケージレジストリ (メタデータ確認用)
+npmjs.com
+pypi.org
+pnpm.io
+astral.sh
+
+# 主要フレームワーク公式
+react.dev
+vuejs.org
+vitejs.dev
+nextjs.org
+svelte.dev
+
+# LLM ベンダー公式
+anthropic.com
+platform.openai.com
+openai.com

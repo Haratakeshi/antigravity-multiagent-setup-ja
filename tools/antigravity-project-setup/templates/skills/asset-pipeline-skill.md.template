@@ -1,0 +1,33 @@
+---
+name: asset-pipeline-skill
+description: "Generate, adapt, validate, and document production-quality image assets for {{PROJECT_NAME}} using AGY native image generation when available."
+---
+
+# Asset Pipeline Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** の画像アセットを、生成から検証まで一貫して整備するための Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Capability Hints**: {{CAPABILITY_HINTS}}
+- **AGY native image generation**: {{IMAGE_GENERATION_STATUS}}
+
+## 手順
+1. **アセット台帳を作る**
+   - 必要な画像を OGP、favicon/app icon、ストア画像、UI素材、ゲーム背景、スプライト、キャラクター、エフェクトに分類する。
+   - 各アセットに用途、サイズ、形式、透過要否、参照スタイル、出力先を定義する。
+2. **参照画像を集める**
+   - 既存ロゴ、キャラクター、背景、UI部品がある場合はパスを列挙してから生成する。
+   - スタイル踏襲が必要な場合は、参照画像なしで生成を始めない。
+3. **生成・加工する**
+   - AGY native image generation が利用可能なら、用途、サイズ、透過、参照画像、禁止事項を明示して生成する。
+   - 透過が必要な場合はアルファチャンネルを検証し、不要な背景色や余白を除去する。
+4. **検証する**
+   - Web OGP: 実メタタグ、画像URL、縦横比、SNSカードサイズを確認する。
+   - Native: 各プラットフォームのアイコンサイズ、角丸/余白、ストアスクリーンショットを確認する。
+   - Game: スプライトシートのフレームサイズ、順序、アンカー、背景透過、実行時描画を確認する。
+
+## 完了条件
+- 生成プロンプト、参照画像、出力ファイル、利用箇所が記録されている。
+- プレースホルダーが残っていない。
+- 必要な透過・サイズ・フォーマット検証が完了している。

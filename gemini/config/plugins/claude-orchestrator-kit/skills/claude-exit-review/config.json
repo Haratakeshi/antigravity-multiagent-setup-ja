@@ -1,0 +1,8 @@
+{
+  "cli_path": "claude",
+  "model": "sonnet",
+  "expected_model_substring": "sonnet",
+  "allowed_tools": ["Read", "Grep", "Glob"],
+  "timeout_sec": 900,
+  "max_diff_bytes": 400000
+}

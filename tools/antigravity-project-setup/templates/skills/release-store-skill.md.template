@@ -1,0 +1,29 @@
+---
+name: release-store-skill
+description: "Set up release readiness for {{PROJECT_NAME}}: versioning, changelogs, store metadata, screenshots, signing, Fastlane, and rollout checks."
+---
+
+# Release / Store Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** のリリース、配布、ストア提出、ロールアウトを整備する Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Deploy Environment**: {{DEPLOY_ENV}}
+- **Capability Hints**: {{CAPABILITY_HINTS}}
+
+## 手順
+1. **リリース形態を決める**
+   - Web deploy、App Store、Google Play、TestFlight、internal testing、ゲーム配信、desktop配布を分類する。
+2. **バージョン管理を整備する**
+   - version、build number、changelog、release notes、migration notes、rollback条件を決める。
+3. **素材を整備する**
+   - icon、OGP、store screenshots、preview video、privacy labels、game capsule/banner などを `asset-pipeline-skill` と連携して作る。
+4. **署名と配布を確認する**
+   - iOS/Android signing、Fastlane lanes、service account、API key、provisioning を secret 管理と接続する。
+5. **ロールアウトを検証する**
+   - staging/preview、本番 smoke、監視、rollback、段階リリースを定義する。
+
+## 完了条件
+- リリース先、versioning、release notes、素材、署名/secret、rollback が整理されている。
+- Native/Game の場合、ストア審査に必要な画像・メタデータ・プライバシー項目がタスク化されている。

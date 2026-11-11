@@ -1,0 +1,35 @@
+---
+name: web-service-readiness-skill
+description: "Prepare web apps for real service delivery: OGP, metadata, DB/storage, auth, deploy, smoke tests, and launch checks for {{PROJECT_NAME}}."
+---
+
+# Web Service Readiness Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** を、単なる画面実装ではなくサービス提供できる Web アプリとして整備するための Skill です。
+
+## 前提
+- **Frameworks**: {{FRAMEWORKS}}
+- **Database / Storage**: {{DATABASES}}
+- **Deploy Environment**: {{DEPLOY_ENV}}
+- **Capability Hints**: {{CAPABILITY_HINTS}}
+
+## チェックリスト
+- OGP / SEO:
+  - `title`, `description`, canonical URL, Open Graph, Twitter Card, favicon, app icons をルーティング方式に合わせて実装する。
+  - OGP画像が未整備なら `asset-pipeline-skill` を起動し、実画像を生成する。
+- DB / Storage:
+  - 永続化が必要なユーザーデータ、管理データ、分析データを洗い出す。
+  - DB未決定なら `db-setup-skill` で PostgreSQL / Supabase / Firestore / SQLite / なしを比較し、理由を残す。
+- Auth / Secrets:
+  - 認証が必要かを判定し、必要ならセッション、CSRF、OAuth callback、環境変数、権限境界を設計する。
+  - 秘密情報は `.env` 例示ファイルにキー名だけを置き、値をコミットしない。
+- Deploy:
+  - `deploy-skill` と `scripts/deploy.sh` を使い、lockfile準拠の install/lint/test/build/deploy を通す。
+  - Firebase / Vercel / Cloud Run など公式手順に `npx` が含まれる場合は実行前に `capability-discovery-skill` で pnpm 置換を確定する。
+- Smoke Test:
+  - 本番相当ビルドを起動し、主要画面、主要フロー、メタタグ、画像ロード、DB接続、エラーログを確認する。
+
+## 完了条件
+- OGP/SEO と favicon/app icon が実装または不要理由付きで記録されている。
+- DB/Storage/Auth の採否が記録されている。
+- デプロイ先と検証コマンドが実行可能な形で整理されている。

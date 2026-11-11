@@ -1,0 +1,12 @@
+{
+  "process-review-gate": {
+    "enabled": true,
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ~/.gemini/scripts/process-review-gate.mjs",
+        "timeout": 30
+      }
+    ]
+  }
+}

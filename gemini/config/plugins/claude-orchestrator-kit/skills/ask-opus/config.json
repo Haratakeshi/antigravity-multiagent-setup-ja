@@ -1,0 +1,8 @@
+{
+  "cli_path": "claude",
+  "model": "opus",
+  "expected_model_substring": "opus",
+  "tools": ["Read", "Grep", "Glob"],
+  "timeout_sec": 900,
+  "max_context_bytes": 400000
+}

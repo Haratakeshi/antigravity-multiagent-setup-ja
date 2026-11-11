@@ -1,0 +1,35 @@
+---
+name: capability-discovery-skill
+description: "Research official docs and decide which skills, agents, MCP servers, CLIs, DB tooling, image tooling, and deploy integrations are required for {{PROJECT_NAME}}."
+---
+
+# Capability Discovery Skill
+
+この Skill は、プロジェクト **{{PROJECT_NAME}}** に不足している能力を調査し、導入可否を判断するための手順です。
+
+## 前提
+- **プロジェクト種別**: {{PROJECT_TYPES}}
+- **検出された能力ヒント**: {{CAPABILITY_HINTS}}
+- **パッケージマネージャー**: {{PACKAGE_MANAGER}}
+**能力インベントリ**:
+{{CAPABILITY_INVENTORY}}
+**CLIインベントリ**:
+{{CLI_INVENTORY}}
+
+## 実行手順
+1. **提供価値から逆算する**
+   - Web: OGP/SEO、DB/認証、デプロイ、ドメイン、環境変数、観測性が必要かを判定する。
+   - Native: アイコン、ストア用スクリーンショット、権限、署名、Fastlane、クラッシュログが必要かを判定する。
+   - Game: スプライト、背景、効果音、透過、アトラス、ランタイム性能、ストア用素材が必要かを判定する。
+2. **一次情報を調査する**
+   - ベンダー公式ドキュメント、公式CLI、公式MCP、公式Plugin/Skill を優先する。
+   - 公式手順が `npx` を示す場合も実行せず、バージョンを確認して `pnpm dlx <pkg>@<固定バージョン>` またはローカル依存の `pnpm exec` に置換する。
+3. **導入判断を記録する**
+   - `required`: サービス提供やリリースに必須。
+   - `conditional`: 要件次第で必要。条件を明記する。
+   - `rejected`: 不要または危険。理由を明記する。
+
+## 完了条件
+- 不足している能力が `required / conditional / rejected` に分類されている。
+- 公式ドキュメントURL、確認日、採用バージョン、pnpm/uv 置換案が記録されている。
+- 導入が必要な項目は、対応する Agent または Skill に引き継げる粒度まで分解されている。

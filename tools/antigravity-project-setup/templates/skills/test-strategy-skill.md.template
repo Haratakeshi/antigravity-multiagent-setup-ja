@@ -1,0 +1,32 @@
+---
+name: test-strategy-skill
+description: "Design the minimum sufficient automated and manual test strategy for {{PROJECT_NAME}} across unit, integration, E2E, visual, native, and game workflows."
+---
+
+# Test Strategy Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** のテスト戦略を、形だけのカバレッジではなく失敗を検出できる設計にするための Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Frameworks**: {{FRAMEWORKS}}
+- **Database / Storage**: {{DATABASES}}
+
+## 手順
+1. **リスクを列挙する**
+   - 状態遷移、境界値、偽陽性、偽陰性、DB制約、権限、非同期、外部API、画像/アセットロード、デプロイ後 smoke を洗い出す。
+2. **テスト層を決める**
+   - Unit: 純粋ロジック、validation、state reducer.
+   - Integration: DB/ORM、API、auth boundary、migration.
+   - E2E: 主要ユーザーフロー、決済/認証/投稿など。
+   - Visual/Asset: OGP、レスポンシブ、native screenshot、sprite transparency.
+   - Game: game loop、collision、scene transition、save/load。
+3. **実行コマンドを設計する**
+   - 既存 scripts を優先し、ない場合は `capability-discovery-skill` で公式ツールと固定バージョンを確認する。
+4. **CI/Deploy gate へ接続する**
+   - `scripts/deploy.sh` が何を通すべきかを具体化する。
+
+## 完了条件
+- リスク別のテスト一覧と実行コマンドがある。
+- モックで意味のない coverage を増やすだけのテストが除外されている。
+- deploy 前に最低限通す gate が明記されている。

@@ -1,0 +1,46 @@
+name: Auto-Close Pull Requests (No-PR Policy)
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close-pr:
+    # リポジトリオーナー本人以外の PR を自動案内＆クローズ
+    if: github.event.pull_request.user.login != github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment and close PR politely
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const baseRef = context.payload.pull_request.base.ref || "main";
+            const contributingUrl = `https://github.com/${owner}/${repo}/blob/${baseRef}/CONTRIBUTING.md`;
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: [
+                "ご提案ありがとうございます！ / Thank you for your interest in this repository!",
+                "",
+                `本リポジトリは個人の Antigravity マルチエージェント環境をオープン共有するためのリファレンス公開リポジトリであり、**原則として Pull Request は受け付けておりません**（[CONTRIBUTING.md](${contributingUrl}) 参照）。`,
+                "MIT ライセンスで公開しておりますので、ぜひご自身の環境向けに **Fork** して自由にカスタマイズ・ご活用ください！",
+                "",
+                "---",
+                `This repository is shared openly under the MIT License as a personal reference setup, and **we do not accept Pull Requests** (see [CONTRIBUTING.md](${contributingUrl})). Please feel free to **fork** this repository and customize it for your own workflow!`
+              ].join("\n")
+            });
+
+            await github.rest.pulls.update({
+              owner,
+              repo,
+              pull_number: prNumber,
+              state: "closed"
+            });

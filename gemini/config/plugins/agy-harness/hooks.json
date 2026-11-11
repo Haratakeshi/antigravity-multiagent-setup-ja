@@ -1,0 +1,62 @@
+{
+  "command-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/guard_commands.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "test-integrity-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|write_to_file|create_file|edit_file|replace_file_content|multi_replace_file_content|multi_edit|apply_diff|apply_patch|delete_file|remove_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/guard_file_edits.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "trust-boundary-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "read_url|read_url_content|open_url|read_url_contents|open_browser_url|read_browser_page",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/guard_urls.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "session-grounding": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 ./scripts/session_context.py",
+        "timeout": 10
+      }
+    ]
+  },
+  "completion-gate": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 ./scripts/stop_selfreview.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

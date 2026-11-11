@@ -1,0 +1,28 @@
+---
+name: game-asset-pipeline-skill
+description: "Create and validate game-specific sprite/background/icon assets for {{PROJECT_NAME}} with style references and transparency checks."
+---
+
+# Game Asset Pipeline Skill
+
+ゲーム向けアセットを、既存スタイルの踏襲、スプライト生成、透過、実機描画検証まで扱う Skill です。
+
+## 前提
+- **AGY native image generation**: {{IMAGE_GENERATION_STATUS}}
+
+## 手順
+1. **既存コンテキストを収集する**
+   - キャラクター、背景、UI、色、解像度、タイルサイズ、スプライトシート規約を確認する。
+   - 参照画像がある場合は、生成プロンプトに必ずパスと継承したい特徴を含める。
+2. **スプライト仕様を固定する**
+   - フレーム幅/高さ、行/列、アニメーション名、フレーム順、余白、アンカー、透過要否を先に決める。
+3. **生成する**
+   - AGY native image generation を利用できる場合は、参照画像と仕様を渡してスプライトシートまたは個別フレームを生成する。
+   - 背景透過が必要な場合は、生成後に透明背景へ加工し、アルファチャンネルを検証する。
+4. **組み込んで検証する**
+   - 実行画面で非空描画、フレーム切替、当たり判定とのズレ、背景色混入、縮小時の破綻を確認する。
+
+## 完了条件
+- 参照画像、生成プロンプト、出力先、フレーム仕様が記録されている。
+- 透過と実行時描画が確認されている。
+- プレースホルダーやスタイル不一致の仮素材が残っていない。

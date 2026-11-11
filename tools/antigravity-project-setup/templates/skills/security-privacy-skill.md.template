@@ -1,0 +1,31 @@
+---
+name: security-privacy-skill
+description: "Set up security and privacy readiness for {{PROJECT_NAME}}: auth, authorization, input validation, CSP/CORS, secrets, PII, and privacy review."
+---
+
+# Security / Privacy Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** のセキュリティとプライバシーを、実装前後に確認するための Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Frameworks**: {{FRAMEWORKS}}
+- **Database / Storage**: {{DATABASES}}
+- **Deploy Environment**: {{DEPLOY_ENV}}
+
+## 手順
+1. **保護対象を洗い出す**
+   - 個人情報、認証情報、決済情報、管理画面、DB書き込み、ファイルアップロード、外部APIキーを分類する。
+2. **境界を設計する**
+   - Auth/AuthZ、CSRF、CORS、CSP、Rate limit、入力バリデーション、セッション、cookie属性、Webhook署名を確認する。
+3. **秘密情報とログを確認する**
+   - 秘密値をコミットしない。ログに token、email、住所、決済情報、API response の機密部分を出さない。
+4. **プライバシー対応を確認する**
+   - 収集データ、利用目的、保持期間、削除方法、外部送信先、ストア privacy labels / manifest が必要かを判断する。
+5. **検証する**
+   - 権限境界、偽陽性/偽陰性、無効入力、未認証、期限切れセッション、CORS/CSP 違反をテストする。
+
+## 完了条件
+- 保護対象と境界が記録されている。
+- 採用するセキュリティ対策が実装またはタスク化されている。
+- プライバシー上の収集/保存/削除/外部送信方針が明記されている。

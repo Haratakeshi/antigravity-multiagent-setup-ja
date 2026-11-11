@@ -1,0 +1,28 @@
+---
+name: accessibility-skill
+description: "Set up accessibility requirements and verification for {{PROJECT_NAME}} across web, native, and game experiences."
+---
+
+# Accessibility Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** を、より多くのユーザーが使える状態にするためのアクセシビリティ Skill です。
+
+## 前提
+- **Project Types**: {{PROJECT_TYPES}}
+- **Frameworks**: {{FRAMEWORKS}}
+
+## 手順
+1. **対象基準を決める**
+   - Web: WCAG、semantic HTML、keyboard navigation、focus、contrast、reduced motion。
+   - Native: VoiceOver/TalkBack、Dynamic Type、touch target、platform accessibility labels。
+   - Game: 色覚差、字幕、音なしプレイ、入力代替、難易度/速度調整。
+2. **実装ルールを作る**
+   - 画像 alt、label、role、focus order、error messaging、gesture alternative、screen reader text を明記する。
+3. **検証する**
+   - 自動 lint/a11y test、キーボード操作、スクリーンリーダー、コントラスト、モバイル表示、ゲーム入力の手動確認を行う。
+4. **例外を記録する**
+   - 実装できない項目は理由、影響、代替策、将来対応を記録する。
+
+## 完了条件
+- 対象基準と検証手順がある。
+- 主要フローをキーボード/スクリーンリーダー/代替入力で確認している、または明確な未対応タスクがある。

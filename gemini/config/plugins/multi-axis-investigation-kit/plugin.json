@@ -1,0 +1,16 @@
+{
+  "name": "multi-axis-investigation-kit",
+  "displayName": "Multi-Axis Investigation Kit (直交多軸調査)",
+  "version": "1.1.0",
+  "description": "1つの発見で探索を打ち切る認知的閉鎖 (Closure Bias) を防ぎ、内外両面観測・直交多軸探索・リフレーミング自己反証を強制する調査規律プラグイン。",
+  "author": {
+    "name": "Haratakeshi",
+    "url": "https://github.com/Haratakeshi"
+  },
+  "repository": "https://github.com/Haratakeshi/antigravity-multiagent-setup-ja",
+  "suggestedPrompts": [
+    "multi-axis-investigation スキルを使って、この不具合の原因を直交3軸で並行調査して",
+    "最新の公式仕様とローカル実装の乖離を内外両面観測で突き合わせて",
+    "現在の結論に対して Devil's Advocate の反証チェックを1手実行して"
+  ]
+}

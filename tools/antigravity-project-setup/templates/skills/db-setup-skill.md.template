@@ -1,0 +1,32 @@
+---
+name: db-setup-skill
+description: "Decide and implement database/storage setup, migrations, seeds, and access patterns for {{PROJECT_NAME}}."
+---
+
+# Database Setup Skill
+
+対象プロジェクト **{{PROJECT_NAME}}** のデータ層を、必要性判断から実装・検証まで整備するための Skill です。
+
+## 前提
+- **Detected Database / Storage**: {{DATABASES}}
+- **Frameworks**: {{FRAMEWORKS}}
+- **Package Manager**: {{PACKAGE_MANAGER}}
+
+## 手順
+1. **DB要否を判断する**
+   - 永続化が必要なデータ、ユーザー別データ、管理データ、監査ログ、分析イベントを洗い出す。
+   - DBが不要な静的サイトや完全クライアントツールなら、不要理由を記録する。
+2. **選定する**
+   - PostgreSQL / Supabase / Firestore / SQLite / 既存DB / なしを、要件、運用、セキュリティ、コスト、デプロイ先で比較する。
+   - 既存プロジェクトに Prisma / Drizzle / Alembic / Django migrations 等がある場合、その方針を優先する。
+3. **実装する**
+   - スキーマ、マイグレーション、インデックス、シード、環境変数、接続ラッパーを整備する。
+   - SQLはパラメータバインディングを使い、文字列連結でクエリを組み立てない。
+4. **検証する**
+   - 境界値、制約違反、重複、ロールバック、権限、偽陽性/偽陰性をテストする。
+   - 破壊的マイグレーションは段階移行に分割する。
+
+## 完了条件
+- DB採否と選定理由が記録されている。
+- マイグレーションと接続設定が再現可能で、秘密情報がコミットされていない。
+- データ層のテストまたは手動検証手順が通っている。
