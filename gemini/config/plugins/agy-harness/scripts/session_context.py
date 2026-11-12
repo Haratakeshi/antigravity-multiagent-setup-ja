@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # agy-harness: セッションGrounding注入 (PreInvocation)
-# 会話の最初のモデル呼び出しで「今日の日付 + 最適解プロトコル」を注入。
-# 以後は25回のモデル呼び出しごとに短いリマインドを再注入 (Context Decay 対策)。
+# 初回(n==0)と以後40回のモデル呼び出しごとに、本日日付と最小リマインドを公式 systemMessage 形式で注入する。
 import datetime
 import json
 import os
+import re
 import sys
 
 
@@ -15,16 +15,18 @@ def emit(obj):
 
 try:
     payload = json.load(sys.stdin)
-    cid = str(payload.get("conversationId", ""))
+    raw_cid = str(payload.get("conversationId", "")).strip()
 except Exception:
     emit({})
 
-if not cid.strip():
+cid = re.sub(r"[^A-Za-z0-9_-]", "_", raw_cid)
+if not cid:
     emit({})
 
 state_dir = os.path.join(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
-    "agy-harness")
+    "agy-harness",
+)
 os.makedirs(state_dir, exist_ok=True)
 state_file = os.path.join(state_dir, cid + ".count")
 
@@ -41,17 +43,13 @@ with open(state_file, "w", encoding="utf-8") as f:
 today = datetime.date.today().isoformat()
 
 if n == 0:
-    msg = f"""[agy-harness] 本日: {today}。あなたの学習知識は本日時点では陳腐化している前提で作業する。
-最適解プロトコル:
-1. ライブラリ/API/モデル名/CLIフラグは、着手前にWeb検索または公式ドキュメントで実在と最新仕様を確認してから使うのが最適解。
-2. 最初に発見したドキュメント・コードは「候補」にすぎない。更新日時・公式性・参照元を確認し、独立した2つ目のソースで裏取りしてから採用するのが最適解。deprecated / 旧API / どこからも参照されないコードは Legacy の兆候。
-3. テスト失敗時の修正対象はアプリケーションコード。テストの期待値は仕様から導出するのが最適解 (実装出力のコピー・skip/only による回避をしない)。
-4. 「動作した」報告には実行コマンドと exit code を添えるのが最適解。未検証の事項は unverified と明記する。
-5. 削除・上書きの前に対象を読み、影響範囲 (Aを変更するとBとCに影響) を報告するのが最適解。"""
-elif n % 25 == 0:
-    msg = (f"[agy-harness] リマインド (本日: {today}): テストの期待値は仕様から / "
-           "報告は証拠 (コマンド+exit code) つき / 未確認のAPI・モデル名は使用前にGrounding / "
-           "削除・上書き前に影響範囲を報告。")
+    msg = (
+        f"[agy-harness] 本日: {today}。"
+        "高速変化領域(API・モデル名・CLI・価格)は§4.6 Groundingで一次確認し、"
+        "完了報告は§0.5の証拠(コマンド+exit code / file:line)と完了マーカーを添えること。"
+    )
+elif n % 40 == 0:
+    msg = f"[agy-harness] リマインド({today}): 期待値は仕様から導出 / 報告は客観証拠つき / 削除・上書き前に影響確認。"
 else:
     emit({})
 

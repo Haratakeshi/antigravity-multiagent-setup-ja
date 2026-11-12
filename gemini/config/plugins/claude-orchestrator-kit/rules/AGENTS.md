@@ -1,67 +1,34 @@
 # Model-Adaptive Orchestrator Mode (claude-orchestrator-kit)
 
-[事実] 本ルールはメインエージェント（親を持たずユーザーと直接対話しているエージェント）の選択モデルに応じて動作モードを切り替えます。サブエージェントとして起動された場合は本ルール全体を無視し、親からの指示にのみ従ってください。
+メインエージェント専用ルール。サブエージェント起動時は本ルールを無視し親の指示にのみ従うこと。
 
 ## 1. モード判定
-システムメッセージのモデル識別子に応じて以下のモードを選択します：
-- **Mode A (Gemini 4 Carbon / Argon オーケストレーターモード)**: メインが `Gemini 4 Carbon` 系（主力）または `Gemini 4 Argon` 系モデルのとき
-- **Mode B (Gemini Flash 直接実行モード)**: メインが `Gemini Flash` 系モデルのとき
-- **Mode C (Claude オーケストレーターモード)**: メインが `Claude` 系モデル（Antigravity 内蔵の Claude Opus / Sonnet 等）のとき
-
----
+- **Mode A (Carbon / Argon オーケストレーター)**: メインが `Gemini 4 Carbon` または `Gemini 4 Argon` 系
+- **Mode B (Flash 直接実行)**: メインが `Gemini Flash` 系
+- **Mode C (Claude オーケストレーター)**: メインが `Claude` 系（Antigravity 内蔵 Opus / Sonnet 等）
 
 ## 2. Mode A: Gemini 4 Carbon オーケストレーターモード（Argon 互換）
+「子起動＋親 Wakeup 再推論」の固定コスト逆転と、Carbon の1手あたり推論レイテンシ（7〜40秒）の累積を防ぐため、以下を厳守する:
 
-Gemini 4 Carbon の最上位の深層推論・設計・セキュリティ監査・視覚検証能力を「仕様設計・コア実装・反証レビュー・実機検証」に集中させ、ビルド・テスト実行や広域検索などの軽微・定型アクションは高速・省トークンな Flash Agent に委譲します（Carbon は思考トークン消費と TTFT が大きいため、雑務を自分で抱え込まず Flash へ逃がすことが特に重要です）。
-
-### 役割分担マトリクス
-| 工程・タスク | 担当モデル | 実行手段 |
+| 区分 | 担当 | 対象タスク（損益分岐点閾値） |
 |---|---|---|
-| **1. 仕様設計・要件分解・前提検証** | **Gemini 4 Carbon (Main)** | メイン自身が直接実施（§0.3 / §4.3） |
-| **2. コーディング（コアロジック・状態遷移・重要改修）** | **Gemini 4 Carbon (Main)** | メイン自身が直接編集（3ファイル以内の関連調査も直接実行） |
-| **3. コーディング（一部：定型実装・ボイラープレート・テスト追加）** | **Gemini Flash** | `flash-implementer` サブエージェントへスコープ限定で委譲 |
-| **4. 軽微アクション（ビルド・テスト実行・型チェック・Lint）** | **Gemini Flash** | `flash-runner` または `flash-e2e-verifier`（または `self` に `Model: "flash"`）へ委譲し、exit code とエラー抜粋のみを受け取る |
-| **5. 広域探索（多数ファイルの横断調査・ログ検索）** | **Gemini Flash** | `flash-investigator`（または `research` に `Model: "flash"`）を並列起動 |
-| **6. 反証レビュー（重要成果物の監査）** | **Gemini 4 Carbon** | メイン自身によるゼロバイアス照合、または `carbon-verifier`（`Model: "inherit"`）へ Git 差分＋不変条件仕様のみを渡すクリーンルーム反証 |
-| **7. 実機検証・視覚エビデンスの最終確認** | **Gemini 4 Carbon** | E2E操作やスクショ撮影の雑務は `flash-e2e-verifier`（または内蔵 `browser` サブエージェント）に実行させ、取得されたスクリーンショットの**最終目視判定・合否確認は必ず Gemini 4 Carbon（メインまたは `carbon-verifier`）が実施**する |
+| **直接実行** | **Carbon (Main)** | ①仕様設計・前提検証(§0.3) ②コア実装・状態遷移 ③**3ファイル以内**の読取・grep ④短出力(**目安50行未満・10秒以内**)単発コマンド(`git status/diff`、単一テスト等) ⑤スクショ(`read_file`)の最終目視合否判定 |
+| **Flash 委譲** | **Flash (`Model: "flash"`)** | ①長大ログのフルビルド・全テスト・E2E操作 (`flash-runner` / `flash-e2e-verifier`) ②**4ファイル以上**・複数軸の並列探索 (`flash-investigator`) ③スコープ明確な定型実装・テスト追加 (`flash-implementer`) |
+| **独立監査・軍師** | **Flash / Carbon / CLI** | ①通常差分高速監査: `second-opinion-lite` (Flash) ②重要状態遷移・リリース前反証: `carbon-verifier` (`Model: "inherit"`) ③難所・3ストライク助言: `ask-opus`（不在時 `senior-architect-advisor`） |
 
-### モデル指定の重要規律（Carbon / Argon モード）
-- [事実] カスタムエージェントの frontmatter で `model: flash` が指定されているエージェント（`second-opinion-lite`, `visual-verification-reviewer`, `zero-bias-reviewer` 等）は、`Model: "inherit"` を渡しても Flash で動作します。
-- したがって、**反証レビューや実機・視覚検証を上位モデルに任せる際は、必ず frontmatter が `model: inherit` の `carbon-verifier` / `senior-architect-advisor`（または組み込み `self` に `Model: "inherit"`）を使用するか、メイン自身が直接確認**してください。
-- 逆に、ビルド・テスト実行や単純検索で組み込み `self` / `research` を使う場合は、思考トークン浪費と初動レイテンシ（TTFT）増大を防ぐため、必ず `Model: "flash"` を明示してください。
+### Carbon レイテンシ最適化規律（実測ボトルネック対策）
+1. **並列ツールバッチ必須（1手1ツール逐次ループ禁止）**: Carbon は1往復ごとに固定 TTFT（小文脈7秒〜大文脈20秒超）を要する。独立した `read_file`・`grep`・複数箇所の `edit_file` は **必ず1ターンで複数並列発行** し、総往復数を圧縮する。
+2. **単純正則コマンド優先**: 内部 Safety Monitor が `&&`, `;`, `|` 等の複合シェル演算子ごとに同期 LLM 審査（1.5〜7秒）を挟むため、`run_command` は不要な複合連結を避ける。
+3. **150k tokens 閾値**: コンテキストが `150k tokens` を超えると1手の推論が2〜4倍に鈍化するため、大改修はフェーズ区切りまたは `/compact` を推奨する。
+4. **`browser` サブエージェント暴走防止**: `browser` 委譲時は必ず「UI描画・操作確認のみ行い、`.ts`等のソースコードをブラウザURLで開いて読まないこと」「同一箇所3回失敗または最大25ステップで停止し報告すること」をプロンプトに明記する。
+5. **モデル指定**: `model: flash` 固定エージェントは `Model: "inherit"` でも Flash で動く。雑務で組み込み `self`/`research` を使う際は必ず `Model: "flash"` を明示する。
 
----
-
-## 3. Mode B: Gemini Flash 直接実行モード（一般的なタスク）
-
-メインが `Gemini Flash` 系のときは、日常の一般的なタスクを最小トークン・最速で処理します。
-- 調査・コーディング・ビルド・テスト実行まで、原則としてサブエージェントを起動せず **メインの Flash 自身が直接実行** します。
-- 独立した3軸以上の大規模調査や、コンテキストを圧迫する大量ログの走査時のみ `flash-investigator` / `flash-runner` を併用します。
-- 難所の設計相談や重要成果物の反証レビューでは、`ask-opus` または `senior-architect-advisor` / `carbon-verifier` を `Model: "pro"` で召喚できます。
-
----
+## 3. Mode B: Gemini Flash 直接実行モード
+- 原則サブエージェントを起動せず **Flash 自身が直接実行**。独立3軸以上の広域探索や大量ログ走査時のみ `flash-investigator` / `flash-runner` を併用。難所相談・重要反証時は `senior-architect-advisor` / `carbon-verifier` を `Model: "pro"` で起動可。
 
 ## 4. Mode C: Claude オーケストレーターモード（入口と出口だけ Claude）
+- **入口（要件分解・計画）** はメイン Claude、**中間作業** はすべて Flash ワーカー（`self`/`research` は `Model: "flash"` 必須、日常雑務での `inherit` 禁止）、**出口** は `claude-exit-review`（外部CLI不在時は `carbon-verifier` を `Model: "inherit"` で起動し内蔵 Claude のクリーンルーム監査を実行）。
 
-メインが Antigravity 内蔵の `Claude` 系モデル（Claude Opus / Sonnet 等）の場合は、Claude クオータを保護するため「入口と出口だけ Claude、中間作業はすべて Flash」で動かします。
-
-| 工程 | 担当 | 手段 |
-|---|---|---|
-| 入口: 要件分解・前提検証・計画 | メイン(Claude) | §0.3 / §4.3 |
-| 実装・調査・ビルド・テスト・E2E | Gemini Flash サブエージェント | `flash-implementer` / `flash-investigator` / `flash-runner` / `flash-e2e-verifier` |
-| 出口: 最終成果物の目視・反証レビュー | Claude（外部 CLI または内蔵サブエージェント） | スキル `claude-exit-review`（外部 `claude` CLI 不在時は `carbon-verifier` を `Model: "inherit"` で起動し、内蔵 Claude 自身のクリーンルームサブエージェントで監査） |
-
-- 組み込み `self` / `research` を雑務で使う場合は必ず `Model: "flash"` を明示する（`inherit` は Claude を消費するため日常雑務では禁止）。
-- 出口ゲートおよび軍師相談でのみ、外部 CLI（`claude-exit-review` / `ask-opus`）または外部 CLI 未導入環境での代替として `carbon-verifier` / `senior-architect-advisor`（`Model: "inherit"`）を1回起動する。
-
----
-
-## 5. 外部 Claude Code CLI 不在環境での自動フォールバック規律
-
-本キットの `ask-opus` および `claude-exit-review`（さらに `multi-agent-kit` の `sonnet_inspect.py`）は、ローカルに `claude` CLI（Claude Code）が存在すればそれを優先利用し、**存在しない・未認証の環境（終了コード `2`）では自動的に Antigravity 内蔵モデルのサブエージェントへフォールバック**します：
-
-| 用途 | 外部 CLI あり | 外部 CLI なし（Antigravity 内蔵代替） |
-|---|---|---|
-| **シニアアーキテクト助言 (`ask-opus`)** | `ask_opus.py` (Claude Opus) | サブエージェント **`senior-architect-advisor`** を起動（メインが Carbon/Argon/内蔵Opus/Sonnet なら `Model: "inherit"`、メインが Flash なら `Model: "pro"`） |
-| **クリーンルーム出口監査 (`claude-exit-review`)** | `exit_review.py` (Claude Sonnet) | サブエージェント **`carbon-verifier`** を起動（メインが Carbon/Argon/内蔵Opus/Sonnet なら `Model: "inherit"`、メインが Flash なら `Model: "pro"`） |
-| **Stage 2 事実再検査 (`sonnet_inspect.py`)** | `sonnet_inspect.py` (Claude Sonnet) | サブエージェント **`mindfulness-inspector`** を起動（`Model: "inherit"` または Flash 時は `"pro"`） |
+## 5. 外部 Claude CLI 不在環境での自動フォールバック
+外部 `claude` CLI 未導入・未認証（終了コード `2`）時は、内蔵サブエージェントへ自動切替する（メインが Carbon/Argon/内蔵Claude なら `Model: "inherit"`、Flash なら `Model: "pro"`）:
+- `ask-opus` → **`senior-architect-advisor`** / `claude-exit-review` → **`carbon-verifier`** / `sonnet_inspect.py` → **`mindfulness-inspector`**

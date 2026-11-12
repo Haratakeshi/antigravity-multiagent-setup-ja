@@ -1,8 +1,8 @@
 {
   "name": "claude-orchestrator-kit",
-  "displayName": "Model-Adaptive Orchestrator Kit (Carbon / Flash / Claude)",
-  "version": "1.2.0",
-  "description": "選択中のメインモデル (Gemini 4 Carbon / Argon / Flash / Claude) に応じて役割分担を自動切替するオーケストレーターキット。Claude Code CLI 連携に加え、CLI 不在時は Antigravity 内蔵の Opus / Sonnet / Carbon サブエージェントへ自動フォールバックします。",
+  "displayName": "Model-Adaptive Orchestrator Kit (Carbon 高速化 / Flash / Claude)",
+  "version": "1.3.0",
+  "description": "選択中のメインモデル (Gemini 4 Carbon / Argon / Flash / Claude) に応じて損益分岐点ベースの役割分担と並列バッチ規律を適用するオーケストレーターキット。外部 Claude CLI 不在時は Antigravity 内蔵の Opus / Sonnet / Carbon サブエージェントへ自動フォールバックします。",
   "author": {
     "name": "Haratakeshi",
     "url": "https://github.com/Haratakeshi"
@@ -11,6 +11,6 @@
   "suggestedPrompts": [
     "ask-opus スキル（または内蔵アーキテクト）で現在の設計トレードオフにセカンドオピニオンをもらって",
     "flash-investigator を並列起動してフロントエンドとバックエンドの実装を同時に調査して",
-    "carbon-verifier で現在の差分と受け入れ基準のクリーンルーム反証レビューを実行して"
+    "carbon-verifier で現在の差分と受け入れ基準の高速バッチ・クリーンルーム反証レビューを実行して"
   ]
 }

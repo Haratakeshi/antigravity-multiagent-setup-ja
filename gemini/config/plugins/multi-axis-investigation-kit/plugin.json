@@ -1,8 +1,8 @@
 {
   "name": "multi-axis-investigation-kit",
   "displayName": "Multi-Axis Investigation Kit (直交多軸調査)",
-  "version": "1.1.0",
-  "description": "1つの発見で探索を打ち切る認知的閉鎖 (Closure Bias) を防ぎ、内外両面観測・直交多軸探索・リフレーミング自己反証を強制する調査規律プラグイン。",
+  "version": "1.3.0",
+  "description": "1つの発見で探索を打ち切る認知的閉鎖 (Closure Bias) を防ぎ、内外両面観測・直交多軸探索・リフレーミング自己反証・並列 Flash 調査展開を強制する調査規律プラグイン。",
   "author": {
     "name": "Haratakeshi",
     "url": "https://github.com/Haratakeshi"

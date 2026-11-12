@@ -6,9 +6,9 @@ Checks:
 2. Sanitization audit: Scans ALL files (including verify.py itself) for hardcoded local user/volume paths,
    secret token formats, or extra caller-supplied regexes (via EXTRA_FORBIDDEN_REGEX env var)
 3. Working tree hygiene: Ensures zero `__pycache__`, `.pyc`, or `.DS_Store` files exist in the repository
-4. Syntax & schema check: All JSON files parse, all Python files compile cleanly into a temp dir,
-   and JS/MJS scripts pass `node --check` (if node is available)
-5. Hook behavior smoke tests: guard_commands.py & stop_selfreview.py
+4. Syntax & schema check: All JSON files parse, all Markdown YAML frontmatters parse cleanly,
+   all Python files compile cleanly into a temp dir, and JS/MJS scripts pass `node --check`
+5. Hook behavior smoke tests: guard_commands.py, session_context.py, stop_selfreview.py, and process-review-gate.mjs
 6. Fallback smoke tests: ask_opus.py / exit_review.py / sonnet_inspect.py emit [FALLBACK_TO_NATIVE_SUBAGENT] when claude CLI is absent
 7. End-to-end install & rollback tests:
    (a) Clean empty home -> install all options -> uninstall -> zero leftover files
@@ -37,7 +37,341 @@ FORBIDDEN_PATTERNS = [
     re.compile("sk-ant-" + r"[A-Za-z0-9_-]{10,}"),
     re.compile("AIza" + r"[0-9A-Za-z_-]{35}"),
     re.compile("ghp_" + r"[0-9A-Za-z]{36}"),
+    re.compile("brain/" + r"<parent-conversation-id>"),
 ]
+
+
+def validate_markdown_frontmatters(errors: list[str]) -> int:
+    md_files = [
+        p
+        for p in sorted(REPO_ROOT.rglob("*.md"))
+        if p.is_file() and ".git" not in p.parts
+    ]
+    checked = 0
+    ruby_bin = shutil.which("ruby")
+    for md in md_files:
+        text = md.read_text(encoding="utf-8")
+        if not text.startswith("---\n") and not text.startswith("---\r\n"):
+            continue
+        lines = text.splitlines()
+        end_idx = None
+        for idx in range(1, len(lines)):
+            if lines[idx].strip() == "---":
+                end_idx = idx
+                break
+        if end_idx is None:
+            errors.append(f"[FRONTMATTER_UNCLOSED] {md.relative_to(REPO_ROOT)}")
+            continue
+        fm_text = "\n".join(lines[1:end_idx])
+        checked += 1
+        if ruby_bin:
+            r = subprocess.run(
+                [ruby_bin, "-W0", "-ryaml", "-e", "YAML.safe_load(STDIN.read)"],
+                input=fm_text,
+                capture_output=True,
+                text=True,
+            )
+            if r.returncode != 0:
+                errors.append(f"[YAML_INVALID] {md.relative_to(REPO_ROOT)}: {r.stderr.strip()}")
+        else:
+            # Minimal cross-platform check for unquoted `: ` inside scalar values
+            for lno, raw_line in enumerate(lines[1:end_idx], start=2):
+                s = raw_line.strip()
+                if not s or s.startswith("#") or s.startswith("-"):
+                    continue
+                if ":" in s:
+                    _, val = s.split(":", 1)
+                    val_s = val.strip()
+                    if val_s and val_s not in (">-", ">", "|", "|-") and not (
+                        (val_s.startswith('"') and val_s.endswith('"'))
+                        or (val_s.startswith("'") and val_s.endswith("'"))
+                    ):
+                        if ": " in val_s:
+                            errors.append(
+                                f"[YAML_UNQUOTED_COLON] {md.relative_to(REPO_ROOT)}:{lno}: quote value containing `: `"
+                            )
+    return checked
+
+
+def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
+    scripts_dir = REPO_ROOT / "gemini" / "config" / "plugins" / "agy-harness" / "scripts"
+    guard_cmd = scripts_dir / "guard_commands.py"
+    for cmd_str, expected_decision in [
+        ("pnpm test", "allow"),
+        ("npm install lodash", "deny"),
+        ("rm -rf ./dist", "force_ask"),
+    ]:
+        r = subprocess.run(
+            [sys.executable, str(guard_cmd)],
+            input=json.dumps({"toolCall": {"name": "run_command", "args": {"CommandLine": cmd_str}}}),
+            capture_output=True,
+            text=True,
+        )
+        try:
+            out = json.loads(r.stdout)
+            if out.get("decision") != expected_decision:
+                errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` -> got {out}, expected {expected_decision}")
+        except Exception as e:
+            errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` invalid JSON: {e}")
+
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp = Path(tmp_str)
+        env = {**os.environ, "XDG_STATE_HOME": str(tmp / "state"), "PYTHONDONTWRITEBYTECODE": "1"}
+
+        # session_context.py test (n==0 injects systemMessage, n==1 emits {})
+        sess_py = scripts_dir / "session_context.py"
+        r0 = subprocess.run(
+            [sys.executable, str(sess_py)],
+            input=json.dumps({"conversationId": "conv-smoke-1"}),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        r1 = subprocess.run(
+            [sys.executable, str(sess_py)],
+            input=json.dumps({"conversationId": "conv-smoke-1"}),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        try:
+            o0 = json.loads(r0.stdout)
+            o1 = json.loads(r1.stdout)
+            sm = (((o0.get("injectSteps") or [{}])[0]).get("systemMessage") or {}).get("systemMessage", "")
+            if "[agy-harness]" not in sm or o1 != {}:
+                errors.append(f"[HOOK_TEST_FAIL] session_context unexpected output: r0={o0}, r1={o1}")
+        except Exception as e:
+            errors.append(f"[HOOK_TEST_FAIL] session_context JSON error: {e}")
+
+        # stop_selfreview.py test (Q&A allow, mutating without marker continue, mutating with GOAL_COMPLETE allow)
+        stop_py = scripts_dir / "stop_selfreview.py"
+        ws_dir = tmp / "ws"
+        art_dir = tmp / "art"
+        ws_dir.mkdir()
+        art_dir.mkdir()
+        tp = tmp / "transcript.jsonl"
+
+        # Case A: Q&A only -> allow
+        tp.write_text(
+            "\n".join([
+                json.dumps({"type": "USER_INPUT", "content": "hello"}),
+                json.dumps({"type": "PLANNER_RESPONSE", "content": "hi"}),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        ra = subprocess.run(
+            [sys.executable, str(stop_py)],
+            input=json.dumps({
+                "terminationReason": "NO_TOOL_CALL",
+                "fullyIdle": True,
+                "conversationId": "cid-qa",
+                "transcriptPath": str(tp),
+                "artifactDirectoryPath": str(art_dir),
+                "workspacePaths": [str(ws_dir)],
+            }),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if json.loads(ra.stdout).get("decision") != "allow":
+            errors.append(f"[HOOK_TEST_FAIL] stop_selfreview Q&A expected allow, got {ra.stdout}")
+
+        # Case B: Real file mutation (double-quoted Path) without GOAL_COMPLETE -> continue
+        target_f = str(ws_dir / "index.ts")
+        tp.write_text(
+            "\n".join([
+                json.dumps({"type": "USER_INPUT", "content": "edit"}),
+                json.dumps({
+                    "type": "PLANNER_RESPONSE",
+                    "content": "done without marker",
+                    "tool_calls": [{"name": "write_file", "args": {"Path": json.dumps(target_f)}}],
+                }),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        rb = subprocess.run(
+            [sys.executable, str(stop_py)],
+            input=json.dumps({
+                "terminationReason": "NO_TOOL_CALL",
+                "fullyIdle": True,
+                "conversationId": "cid-mut-1",
+                "transcriptPath": str(tp),
+                "artifactDirectoryPath": str(art_dir),
+                "workspacePaths": [str(ws_dir)],
+            }),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if json.loads(rb.stdout).get("decision") != "continue":
+            errors.append(f"[HOOK_TEST_FAIL] stop_selfreview unreviewed mutation expected continue, got {rb.stdout}")
+
+        # Case C: Real file mutation WITH GOAL_COMPLETE -> allow
+        tp.write_text(
+            "\n".join([
+                json.dumps({"type": "USER_INPUT", "content": "edit"}),
+                json.dumps({
+                    "type": "PLANNER_RESPONSE",
+                    "content": "all verified <!-- GOAL_COMPLETE -->",
+                    "tool_calls": [{"name": "write_file", "args": {"Path": json.dumps(target_f)}}],
+                }),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        rc = subprocess.run(
+            [sys.executable, str(stop_py)],
+            input=json.dumps({
+                "terminationReason": "NO_TOOL_CALL",
+                "fullyIdle": True,
+                "conversationId": "cid-mut-2",
+                "transcriptPath": str(tp),
+                "artifactDirectoryPath": str(art_dir),
+                "workspacePaths": [str(ws_dir)],
+            }),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if json.loads(rc.stdout).get("decision") != "allow":
+            errors.append(f"[HOOK_TEST_FAIL] stop_selfreview GOAL_COMPLETE expected allow, got {rc.stdout}")
+
+        # Case D: Subagent transcript (NO USER_INPUT, WITH CHECKPOINT + file edit) -> allow
+        tp.write_text(
+            "\n".join([
+                json.dumps({"type": "SYSTEM_MESSAGE", "content": "subagent prompt"}),
+                json.dumps({"type": "CHECKPOINT", "content": "compacted"}),
+                json.dumps({
+                    "type": "PLANNER_RESPONSE",
+                    "content": "finished subagent edit without marker",
+                    "tool_calls": [{"name": "write_to_file", "args": {"TargetFile": json.dumps(target_f)}}],
+                }),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        rd = subprocess.run(
+            [sys.executable, str(stop_py)],
+            input=json.dumps({
+                "terminationReason": "NO_TOOL_CALL",
+                "fullyIdle": True,
+                "conversationId": "cid-subagent-cp",
+                "transcriptPath": str(tp),
+                "artifactDirectoryPath": str(art_dir),
+                "workspacePaths": [str(ws_dir)],
+            }),
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if json.loads(rd.stdout).get("decision") != "allow":
+            errors.append(f"[HOOK_TEST_FAIL] stop_selfreview subagent+CHECKPOINT expected allow, got {rd.stdout}")
+
+        # process-review-gate.mjs test (un-audited src/ edit -> continue; subagent+CHECKPOINT -> allow; Round-2 send_message audit -> allow)
+        git_bin = shutil.which("git")
+        proc_mjs = REPO_ROOT / "gemini" / "scripts" / "process-review-gate.mjs"
+        if node_bin and git_bin and proc_mjs.is_file():
+            gws = tmp / "gitws"
+            (gws / "src").mkdir(parents=True)
+            subprocess.run([git_bin, "init", "-q"], cwd=gws, check=True)
+            (gws / "src" / "app.ts").write_text("export const x = 1;\n", encoding="utf-8")
+            ptp = tmp / "proc_transcript.jsonl"
+            src_file = str(gws / "src" / "app.ts")
+
+            # Subagent transcript (NO USER_INPUT, WITH CHECKPOINT + src/ edit) -> allow
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "SYSTEM_MESSAGE", "content": "subagent task"}),
+                    json.dumps({"type": "CHECKPOINT", "content": "compacted"}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "write_to_file", "args": {"TargetFile": json.dumps(src_file)}}],
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            rp_sub = subprocess.run(
+                [node_bin, str(proc_mjs)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "proc-subagent-cp",
+                    "transcriptPath": str(ptp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(gws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if json.loads(rp_sub.stdout).get("decision") != "allow":
+                errors.append(
+                    f"[HOOK_TEST_FAIL] process-review-gate subagent+CHECKPOINT expected allow, got {rp_sub.stdout}"
+                )
+
+            # Un-audited src/ edit -> continue
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "implement"}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "write_file", "args": {"Path": json.dumps(src_file)}}],
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            rp1 = subprocess.run(
+                [node_bin, str(proc_mjs)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "proc-1",
+                    "transcriptPath": str(ptp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(gws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if json.loads(rp1.stdout).get("decision") != "continue":
+                errors.append(f"[HOOK_TEST_FAIL] process-review-gate un-audited expected continue, got {rp1.stdout}")
+
+            # Round 1 invoke_subagent ("\"carbon-verifier\"") -> fix -> Round 2 send_message -> allow
+            audit_id = "11111111-2222-3333-4444-555555555555"
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "implement"}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "invoke_subagent", "args": {"TypeName": json.dumps("carbon-verifier")}}],
+                    }),
+                    json.dumps({"type": "GENERIC", "content": json.dumps({"conversationId": audit_id})}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "edit_file", "args": {"Path": json.dumps(src_file)}}],
+                    }),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "send_message", "args": {"Recipient": json.dumps(audit_id)}}],
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            rp2 = subprocess.run(
+                [node_bin, str(proc_mjs)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "proc-2",
+                    "transcriptPath": str(ptp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(gws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if json.loads(rp2.stdout).get("decision") != "allow":
+                errors.append(f"[HOOK_TEST_FAIL] process-review-gate Round-2 send_message expected allow, got {rp2.stdout}")
 
 
 def run_check() -> int:
@@ -48,12 +382,24 @@ def run_check() -> int:
     if extra_rx:
         active_patterns.append(re.compile(extra_rx, re.IGNORECASE))
 
-    # 1. Working tree hygiene check (no __pycache__ / .pyc / .DS_Store)
+    # 1. Working tree & git tracking hygiene check (no __pycache__/.pyc anywhere; no tracked .DS_Store/Thumbs.db)
     for item in REPO_ROOT.rglob("*"):
         if ".git" in item.parts:
             continue
-        if item.name in ("__pycache__", ".DS_Store") or item.suffix in (".pyc", ".pyo"):
-            errors.append(f"[HYGIENE_FAIL] Unwanted artifact in repo: {item.relative_to(REPO_ROOT)}")
+        if item.name == "__pycache__" or item.suffix in (".pyc", ".pyo"):
+            errors.append(f"[HYGIENE_FAIL] Unwanted Python bytecode artifact in repo: {item.relative_to(REPO_ROOT)}")
+    git_bin_hygiene = shutil.which("git")
+    if git_bin_hygiene and (REPO_ROOT / ".git").exists():
+        r_ls = subprocess.run(
+            [git_bin_hygiene, "-C", str(REPO_ROOT), "ls-files"],
+            capture_output=True,
+            text=True,
+        )
+        if r_ls.returncode == 0:
+            for tracked in r_ls.stdout.splitlines():
+                tname = Path(tracked).name
+                if tname in (".DS_Store", "Thumbs.db") or tracked.endswith((".pyc", ".pyo")):
+                    errors.append(f"[HYGIENE_FAIL] Unwanted OS/bytecode file tracked in git: {tracked}")
 
     # 2. Rule byte limits
     rule_files = [
@@ -86,7 +432,7 @@ def run_check() -> int:
                 line_no = text[: m.start()].count("\n") + 1
                 errors.append(f"[SANITIZE_FAIL] {rel}:{line_no} matched forbidden pattern -> `{m.group(0)}`")
 
-    # 4. JSON, Python (compiled into temp dir), and Node syntax checks
+    # 4. JSON, YAML frontmatter, Python, and Node syntax checks
     json_count = 0
     for jf in sorted(REPO_ROOT.rglob("*.json")):
         if ".git" in jf.parts:
@@ -96,6 +442,8 @@ def run_check() -> int:
             json.loads(jf.read_text(encoding="utf-8"))
         except Exception as e:
             errors.append(f"[JSON_INVALID] {jf.relative_to(REPO_ROOT)}: {e}")
+
+    yaml_fm_count = validate_markdown_frontmatters(errors)
 
     py_count = 0
     with tempfile.TemporaryDirectory() as pyc_tmp:
@@ -121,24 +469,7 @@ def run_check() -> int:
                     errors.append(f"[NODE_SYNTAX_ERROR] {jsf.relative_to(REPO_ROOT)}: {r.stderr.strip()}")
 
     # 5. Hook smoke tests
-    guard_cmd = REPO_ROOT / "gemini" / "config" / "plugins" / "agy-harness" / "scripts" / "guard_commands.py"
-    for cmd_str, expected_decision in [
-        ("pnpm test", "allow"),
-        ("npm install lodash", "deny"),
-        ("rm -rf ./dist", "force_ask"),
-    ]:
-        r = subprocess.run(
-            [sys.executable, str(guard_cmd)],
-            input=json.dumps({"toolCall": {"name": "run_command", "args": {"CommandLine": cmd_str}}}),
-            capture_output=True,
-            text=True,
-        )
-        try:
-            out = json.loads(r.stdout)
-            if out.get("decision") != expected_decision:
-                errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` -> got {out}, expected {expected_decision}")
-        except Exception as e:
-            errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` invalid JSON: {e}")
+    run_hook_smoke_tests(errors, node_bin)
 
     # 6. Fallback smoke test (simulate machine WITHOUT `claude` CLI)
     with tempfile.TemporaryDirectory() as empty_home:
@@ -195,7 +526,6 @@ def run_check() -> int:
         (tmp_home / ".gemini" / "GEMINI.md").write_text("# Original User GEMINI\n", encoding="utf-8")
         (tmp_home / ".gemini" / "config" / "hooks.json").write_text('{"my-hook": {"enabled": true}}\n', encoding="utf-8")
 
-        # Install #1 (default flags)
         subprocess.run(
             [sys.executable, str(REPO_ROOT / "scripts" / "install.py"), "--target-home", str(tmp_home)],
             capture_output=True,
@@ -203,7 +533,6 @@ def run_check() -> int:
             check=True,
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
-        # Install #2 (re-run with optional flags — must NOT clobber Install #1's baseline!)
         subprocess.run(
             [
                 sys.executable,
@@ -225,7 +554,6 @@ def run_check() -> int:
         if not sample_agent.is_file() or "~/.gemini/" in sample_agent.read_text(encoding="utf-8")[:400]:
             errors.append("[INSTALL_TEST_FAIL] `~` in multi-agent-opinion.md frontmatter was not resolved")
 
-        # Uninstall after 2 installs
         subprocess.run(
             [sys.executable, str(REPO_ROOT / "scripts" / "uninstall.py"), "--target-home", str(tmp_home)],
             capture_output=True,
@@ -249,6 +577,7 @@ def run_check() -> int:
         "status": "PASS" if not errors else "FAIL",
         "scanned_text_files": scanned_files,
         "json_files_validated": json_count,
+        "yaml_frontmatters_validated": yaml_fm_count,
         "python_files_compiled": py_count,
         "rule_byte_sizes": rule_sizes,
         "rule_byte_limit": RULE_BYTE_LIMIT,

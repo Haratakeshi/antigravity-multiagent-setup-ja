@@ -38,10 +38,10 @@ python3 ~/.gemini/config/plugins/claude-orchestrator-kit/skills/ask-opus/scripts
   "TypeName": "senior-architect-advisor",
   "Role": "Senior Architect Second-Opinion Advisor",
   "Model": "inherit",
-  "Prompt": "相談テーマ:\n<topic>\n[相談したい論点・設計トレードオフ・3ストライクの状況]\n</topic>\n\n参照対象:\n- リポジトリ: [作業リポジトリパス]\n- 重点ファイル: [対象ファイルパス一覧]\n- レポート保存先: [artifactDir]/opus_advice.md\n\n実際のコードを直接確認した上で、迎合のないシニアアーキテクトとしての推奨設計・盲点・代替案比較をレポート保存先に書き出し、3行要約を send_message で返してください。"
+  "Prompt": "相談テーマ:\n<topic>\n[相談したい論点・設計トレードオフ・3ストライクの状況]\n</topic>\n\n参照対象:\n- リポジトリ: [作業リポジトリパス]\n- 重点ファイル: [対象ファイルパス一覧]\n\n実際のコードを並列バッチで直接確認した上で、迎合のないシニアアーキテクトとしての推奨設計・盲点・代替案比較をあなた自身の artifact ディレクトリ (opus_advice.md, ArtifactMetadata 付き) に write_to_file で書き出し、結論3行要約と保存先絶対パスを send_message で返してください。"
 }
 ```
 
 ## 特徴と安全境界
 1. **安全な読み取り専用境界**: ルート A（`Read,Grep,Glob` 限定）・ルート B ともにプロダクションコードの書き換えやシェル実行は行いません。
-2. **コンテキスト保護**: 詳細な助言は `<artifactDir>/opus_advice.md` に出力させ、メインスレッドのトークン消費を最小化します。
+2. **コンテキスト保護**: 詳細な助言はアーティファクトファイルに出力させ、メインスレッドは返却されたパスを必要な箇所だけ参照します（Antigravity v2.30+ ではサブエージェントは自身の `brain/<subagent-id>/` に出力し絶対パスを親へ共有します）。
