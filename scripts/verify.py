@@ -265,6 +265,62 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
         if json.loads(rd.stdout).get("decision") != "allow":
             errors.append(f"[HOOK_TEST_FAIL] stop_selfreview subagent+CHECKPOINT expected allow, got {rd.stdout}")
 
+        # Case E: Bulk untracked binaries (>=30 .json.gz) after run_command -> continue; once git-added (tracked) -> allow
+        git_bin_stop = shutil.which("git")
+        if git_bin_stop:
+            bin_ws = tmp / "binws"
+            (bin_ws / "pool").mkdir(parents=True)
+            subprocess.run([git_bin_stop, "init", "-q"], cwd=bin_ws, check=True)
+            for idx_b in range(32):
+                (bin_ws / "pool" / f"{idx_b:04d}.json.gz").write_bytes(b"\x1f\x8b\x08\x00")
+            tp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "generate boards"}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "content": "generated <!-- GOAL_COMPLETE -->",
+                        "tool_calls": [{"name": "run_command", "args": {"CommandLine": json.dumps("python3 gen.py")}}],
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            re_untracked = subprocess.run(
+                [sys.executable, str(stop_py)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "cid-bin-untracked",
+                    "transcriptPath": str(tp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(bin_ws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            out_untracked = json.loads(re_untracked.stdout)
+            if out_untracked.get("decision") != "continue" or "未追跡バイナリ検知" not in out_untracked.get("reason", ""):
+                errors.append(f"[HOOK_TEST_FAIL] stop_selfreview 32 untracked .gz expected continue, got {re_untracked.stdout}")
+
+            # Intentionally staged/tracked binaries in repo -> must NOT trigger (allow)
+            subprocess.run([git_bin_stop, "add", "pool"], cwd=bin_ws, check=True)
+            re_tracked = subprocess.run(
+                [sys.executable, str(stop_py)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "cid-bin-tracked",
+                    "transcriptPath": str(tp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(bin_ws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if json.loads(re_tracked.stdout).get("decision") != "allow":
+                errors.append(f"[HOOK_TEST_FAIL] stop_selfreview git-added binaries expected allow, got {re_tracked.stdout}")
+
         # process-review-gate.mjs test (un-audited src/ edit -> continue; subagent+CHECKPOINT -> allow; Round-2 send_message audit -> allow)
         git_bin = shutil.which("git")
         proc_mjs = REPO_ROOT / "gemini" / "scripts" / "process-review-gate.mjs"
