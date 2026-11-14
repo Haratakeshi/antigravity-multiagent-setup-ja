@@ -12,13 +12,13 @@
 
 | 区分 | 担当 | 対象タスク（損益分岐点閾値） |
 |---|---|---|
-| **直接実行** | **Carbon (Main)** | ①仕様設計・前提検証(§0.3) ②コア実装・状態遷移 ③**3ファイル以内**の読取・grep ④短出力(**目安50行未満・10秒以内**)単発コマンド(`git status/diff`、単一テスト等) ⑤スクショ(`read_file`)の最終目視合否判定 |
-| **Flash 委譲** | **Flash (`Model: "flash"`)** | ①長大ログのフルビルド・全テスト・E2E操作 (`flash-runner` / `flash-e2e-verifier`) ②**4ファイル以上**・複数軸の並列探索 (`flash-investigator`) ③スコープ明確な定型実装・テスト追加 (`flash-implementer`) |
-| **独立監査・軍師** | **Flash / Carbon / CLI** | ①通常差分高速監査: `second-opinion-lite` (Flash) ②重要状態遷移・リリース前反証: `carbon-verifier` (`Model: "inherit"`) ③難所・3ストライク助言: `ask-opus`（不在時 `senior-architect-advisor`） |
+| **直接実行** | **Carbon (Main)** | ①仕様設計・前提検証(§0.3) ②コア実装・状態遷移 ③**15ファイル以内**（他プロジェクト横断含む）の並列 `read_file`・`grep` ④短出力(**目安50行未満・10秒以内**)単発コマンド(`git status/diff`、単一テスト等) ⑤スクショ(`read_file`)の最終目視合否判定 |
+| **Flash 委譲** | **Flash (`Model: "flash"`)** | ①長大ログのフルビルド・全テスト・E2E操作 (`flash-runner` / `flash-e2e-verifier`) ②**16ファイル以上**の広域探索または独立3軸以上の大規模調査 (`flash-investigator`) ③スコープ明確な定型実装・テスト追加 (`flash-implementer`) |
+| **独立監査・軍師** | **Flash / Carbon / CLI** | ①日常・通常変更(Tier 0): メイン自身の差分・テスト確認で即時完了（自動サブエージェント起動なし） ②中規模以上の重要変更・明示依頼(Tier 1): `second-opinion-lite` (Flash) / 重要状態遷移・リリース前反証: `carbon-verifier` (`Model: "inherit"`) ③難所・3ストライク助言: `ask-opus`（不在時 `senior-architect-advisor`） |
 
 ### Carbon レイテンシ最適化規律（実測ボトルネック対策）
-1. **並列ツールバッチ必須（1手1ツール逐次ループ禁止）**: Carbon は1往復ごとに固定 TTFT（小文脈7秒〜大文脈20秒超）を要する。独立した `read_file`・`grep`・複数箇所の `edit_file` は **必ず1ターンで複数並列発行** し、総往復数を圧縮する。
-2. **単純正則コマンド優先**: 内部 Safety Monitor が `&&`, `;`, `|` 等の複合シェル演算子ごとに同期 LLM 審査（1.5〜7秒）を挟むため、`run_command` は不要な複合連結を避ける。
+1. **並列ツールバッチ＆ネイティブ読取優先（1手1ツール逐次ループ禁止）**: Carbon は1往復ごとに固定 TTFT（小文脈7秒〜大文脈20秒超）を要する。独立した `read_file`・`grep`・複数箇所の `edit_file` は **必ず1ターンで5〜15件並列発行** し総往復数を圧縮する。ファイル確認・検索は `run_command("python3 ...")`（`unknown_command` 審査 `+1.8s`）や過剰なサブエージェント起動を避け、審査 `0ms`（`allowed_tool`）の `read_file` / `grep` で直接処理する。
+2. **`agy_tool_safety` 同期審査（1.5〜7秒/回）の回避**: `run_command` ではクォート外の複合演算子（`&&`, `;`, `|` → `unquoted_shell_operators`）および不要な絶対パス指定（`/opt/homebrew/bin/pnpm` 等 → `absolute_path`）を避け、PATH 解決の素のコマンド名（`pnpm`, `uv`, `git`）で単発実行する。`cdp-relay` 等の `call_mcp_tool` も1回ごとに `+1.7s` 審査が入るため、細切れ操作を避け `eval` 等でまとめる。
 3. **150k tokens 閾値**: コンテキストが `150k tokens` を超えると1手の推論が2〜4倍に鈍化するため、大改修はフェーズ区切りまたは `/compact` を推奨する。
 4. **`browser` サブエージェント暴走防止**: `browser` 委譲時は必ず「UI描画・操作確認のみ行い、`.ts`等のソースコードをブラウザURLで開いて読まないこと」「同一箇所3回失敗または最大25ステップで停止し報告すること」をプロンプトに明記する。
 5. **モデル指定**: `model: flash` 固定エージェントは `Model: "inherit"` でも Flash で動く。雑務で組み込み `self`/`research` を使う際は必ず `Model: "flash"` を明示する。

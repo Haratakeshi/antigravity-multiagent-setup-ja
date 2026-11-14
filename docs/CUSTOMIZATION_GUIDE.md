@@ -56,6 +56,8 @@ python3 scripts/verify.py
 ## 4. `agy-harness` の Hook を一部調整・無効化したい場合
 
 - **特定ドメインを信頼境界（URL アクセス許可リスト）に追加したい場合**:
-  `~/.gemini/config/plugins/agy-harness/scripts/allowed_domains.txt` に1行1ドメインで追記してください（サブドメインも自動許可されます）。
+  自社や個人プロジェクト固有のドメインは `~/.gemini/config/allowed_domains.local.txt` を新規作成して1行1ドメインで記載するのが推奨です（サブドメインも自動許可され、`install.py` の再実行でも上書きされません。共通リスト `~/.gemini/config/plugins/agy-harness/scripts/allowed_domains.txt` への追記も可能です）。
+- **完了マーカー引き止めだけを一時スキップしたい場合**:
+  未追跡バイナリストーム検知を維持したまま `GOAL_COMPLETE` マーカー確認のみをスキップしたい場合は、環境変数 `AGY_SKIP_STOP_MARKER_GATE=1` を設定できます。
 - **特定の Hook だけを一時的に OFF にしたい場合**:
-  `~/.gemini/config/plugins/agy-harness/hooks.json` 内の該当フックオブジェクト（例: `"completion-gate"`）に `"enabled": false` を追加すると、プラグイン全体を維持したまま個別の Hook だけを無効化できます。
+  `~/.gemini/config/plugins/agy-harness/hooks.json`（または `~/.gemini/config/hooks.json`）内の該当フックオブジェクト（例: `"completion-gate"` や `"process-review-gate"`）に `"enabled": false` を設定すると、プラグイン全体を維持したまま個別の Hook だけを無効化できます。

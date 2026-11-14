@@ -1,6 +1,7 @@
 # agy-harness 信頼境界: サフィックス一致で許可するドメイン
 # 1行1ドメイン。サブドメインも許可される。
 # ここにないドメインは deny ではなく「ask」(その場で承認可能・Always Allow キャッシュ有効)
+# プロジェクト固有ドメインは ~/.gemini/config/allowed_domains.local.txt に記載すると自動読込される。
 
 # Antigravity / Google 公式
 antigravity.google
@@ -27,7 +28,9 @@ learn.microsoft.com
 microsoft.com
 rust-lang.org
 docs.rs
+crates.io
 go.dev
+pkg.go.dev
 
 # パッケージレジストリ (メタデータ確認用)
 npmjs.com
@@ -35,12 +38,27 @@ pypi.org
 pnpm.io
 astral.sh
 
-# 主要フレームワーク公式
+# 主要フレームワーク・テスト公式
 react.dev
 vuejs.org
 vitejs.dev
+vitest.dev
+playwright.dev
 nextjs.org
 svelte.dev
+tailwindcss.com
+prisma.io
+hono.dev
+astro.build
+
+# クラウド・プラットフォーム公式
+cloudflare.com
+vercel.com
+supabase.com
+stripe.com
+line.biz
+apple.com
+steamgames.com
 
 # LLM ベンダー公式
 anthropic.com

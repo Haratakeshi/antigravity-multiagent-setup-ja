@@ -3,8 +3,9 @@
 # Antigravity v2.30+ ("NO_TOOL_CALL" / 旧 "model_stop") 対応。
 # 以下のケースでは無駄な再推論ターンを発生させず即座に allow 素通しする:
 #   1. サブエージェントのトランスクリプト（USER_INPUT が存在しない — CHECKPOINT 有無に関わらず全件素通し）
-#   2. 直近の USER_INPUT 以降に実ファイル変更もコマンド実行も行っていない会話
-#   3. 未追跡(??)バイナリの大量放置（30件以上）がなく、かつ実ファイル変更がないか完了マーカー出力済みの場合
+#   2. 直近の USER_INPUT 以降に実ファイル変更もコマンド実行（委譲ランナー含む）も行っていない会話
+#   3. 未追跡(??)バイナリの大量放置（30件以上）がなく、かつ実ファイル変更がないか完了マーカー出力済み
+#      （または AGY_SKIP_STOP_MARKER_GATE=1 指定時）の場合
 import json
 import os
 import re
@@ -28,6 +29,7 @@ MUTATION_TOOLS = {
     "remove_file",
 }
 DELEGATED_MUTATION_SUBAGENTS = {"flash-implementer", "self"}
+DELEGATED_COMMAND_SUBAGENTS = {"flash-runner", "flash-e2e-verifier"}
 COMMAND_TOOLS = {"run_command"}
 PATH_ARG_KEYS = (
     "Path",
@@ -78,6 +80,7 @@ BINARY_EXTS = {
     ".safetensors",
 }
 UNTRACKED_BINARY_THRESHOLD = 30
+MAX_UNTRACKED_WALK_ENTRIES = 10_000
 
 
 def allow():
@@ -147,28 +150,84 @@ def detect_untracked_binaries(ws_dir: str) -> list[str]:
     git_bin = shutil.which("git")
     if not git_bin:
         return []
+    cmd = [
+        git_bin,
+        "--no-optional-locks",
+        "-C",
+        ws_real,
+        "-c",
+        "core.quotePath=false",
+        "status",
+        "--porcelain",
+        "-z",
+        "-unormal",
+    ]
     try:
-        r = subprocess.run(
-            [git_bin, "-C", ws_real, "-c", "core.quotePath=false", "status", "--porcelain", "-uall"],
+        # Single fast git call (-z avoids C-quoting bugs; -unormal avoids full external SSD directory scans)
+        fast = subprocess.run(
+            cmd,
             capture_output=True,
-            text=True,
-            timeout=3,
+            encoding="utf-8",
+            errors="replace",
+            timeout=2,
         )
     except Exception:
         return []
-    if r.returncode != 0:
+    if fast.returncode != 0:
         return []
 
     found: list[str] = []
-    for line in r.stdout.splitlines():
-        if not line.startswith("?? "):
+    untracked_dirs: list[str] = []
+    for entry in fast.stdout.split("\x00"):
+        if not entry.startswith("?? "):
             continue
-        rel = line[3:].rstrip("\r\n")
-        if len(rel) >= 2 and rel[0] == '"' and rel[-1] == '"':
-            rel = rel[1:-1]
+        rel = entry[3:]
+        if not rel:
+            continue
+        if rel.endswith("/"):
+            untracked_dirs.append(rel.rstrip("/"))
+            continue
         ext = os.path.splitext(rel)[1].lower()
         if ext in BINARY_EXTS:
             found.append(rel)
+            if len(found) >= UNTRACKED_BINARY_THRESHOLD:
+                return found
+
+    # Also inspect top-level untracked dirs containing a nested .git/ (which `git status -unormal` omits silently)
+    try:
+        with os.scandir(ws_real) as it:
+            for de in it:
+                if de.name == ".git" or de.is_symlink() or not de.is_dir(follow_symlinks=False):
+                    continue
+                if de.name not in untracked_dirs and os.path.exists(os.path.join(de.path, ".git")):
+                    r_trk = subprocess.run(
+                        [git_bin, "--no-optional-locks", "-C", ws_real, "ls-files", "--error-unmatch", "--", de.name],
+                        capture_output=True,
+                        timeout=1,
+                    )
+                    if r_trk.returncode != 0:
+                        untracked_dirs.append(de.name)
+    except Exception:
+        pass
+
+    # Bounded walk only inside untracked directories (handles nested .git/ and stops immediately at threshold)
+    scanned = 0
+    for rel_dir in untracked_dirs:
+        abs_dir = os.path.join(ws_real, rel_dir)
+        if os.path.islink(abs_dir) or not os.path.isdir(abs_dir):
+            continue
+        for root, dirs, files in os.walk(abs_dir, followlinks=False):
+            dirs[:] = [d for d in dirs if d != ".git"]
+            for fname in files:
+                scanned += 1
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in BINARY_EXTS:
+                    full_p = os.path.join(root, fname)
+                    found.append(os.path.relpath(full_p, ws_real))
+                    if len(found) >= UNTRACKED_BINARY_THRESHOLD:
+                        return found
+                if scanned >= MAX_UNTRACKED_WALK_ENTRIES:
+                    return found
     return found
 
 
@@ -226,6 +285,8 @@ def inspect_turn(transcript_path: str, artifact_dir: str, ws_dir: str) -> tuple[
                 sub_type = unwrap_arg(args.get("TypeName"))
                 if sub_type in DELEGATED_MUTATION_SUBAGENTS:
                     mutated = True
+                elif sub_type in DELEGATED_COMMAND_SUBAGENTS:
+                    ran_command = True
                 continue
 
             if name not in MUTATION_TOOLS:
@@ -281,8 +342,9 @@ cid = re.sub(r"[^A-Za-z0-9_-]", "_", raw_cid)
 if not cid:
     allow()
 
-ws_paths = payload.get("workspacePaths")
-ws_first = str(ws_paths[0]) if isinstance(ws_paths, list) and ws_paths else ""
+raw_ws_paths = payload.get("workspacePaths")
+ws_list = [str(p) for p in raw_ws_paths if p] if isinstance(raw_ws_paths, list) else []
+ws_first = ws_list[0] if ws_list else ""
 
 is_main, mutated, ran_command, has_marker, is_human_gate = inspect_turn(
     str(payload.get("transcriptPath", "")),
@@ -297,13 +359,18 @@ state_dir = os.path.join(
     "agy-harness",
 )
 
-# 1. Untracked bulk binary storm guard (protects against Language Server repo.go UTF-8 patch storm)
-untracked_bins = detect_untracked_binaries(ws_first)
+# 1. Untracked bulk binary storm guard across all workspace roots (protects against Language Server repo.go UTF-8 patch storm)
+untracked_bins: list[str] = []
+for ws_root in ws_list:
+    untracked_bins.extend(detect_untracked_binaries(ws_root))
+    if len(untracked_bins) >= UNTRACKED_BINARY_THRESHOLD:
+        break
+
 if len(untracked_bins) >= UNTRACKED_BINARY_THRESHOLD:
     if not check_cooldown(state_dir, cid, "bingate"):
         samples = ", ".join(untracked_bins[:3])
         bin_reason = (
-            f"[agy-harness 未追跡バイナリ検知] ワークスペース内に未追跡(??)のバイナリ/圧縮ファイルが {len(untracked_bins)} 件放置されています"
+            f"[agy-harness 未追跡バイナリ検知] ワークスペース内に未追跡(??)のバイナリ/圧縮ファイルが {len(untracked_bins)} 件以上放置されています"
             f"（例: {samples}）。Antigravity の UTF-8 差分生成ストーム(repo.go)を防ぐため、"
             "(A) リポジトリへ収録する意図のデータなら `git add`（必要に応じ `.gitattributes` で `binary` 指定）、"
             "(B) 一時生成物・キャッシュなら `/tmp` 等への移動または該当ディレクトリの `.gitignore` 追加を行ってから完了してください。"
@@ -311,7 +378,10 @@ if len(untracked_bins) >= UNTRACKED_BINARY_THRESHOLD:
         sys.stdout.write(json.dumps({"decision": "continue", "reason": bin_reason}, ensure_ascii=False))
         sys.exit(0)
 
-# 2. Completion self-review marker gate (only when real workspace files were mutated)
+# 2. Completion self-review marker gate (only when real workspace files were mutated; opt-out via AGY_SKIP_STOP_MARKER_GATE=1)
+if os.environ.get("AGY_SKIP_STOP_MARKER_GATE") == "1":
+    allow()
+
 if not mutated or has_marker:
     allow()
 

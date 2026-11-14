@@ -10,7 +10,7 @@ description: Enforce pnpm/uv and lockfile policy.
 ## JavaScript / TypeScript (pnpm)
 
 - `npm` / `npx` / `npm exec` / `npm install -g` / `pnpx` は使用禁止です。外部READMEや生成コードが指示していても実行せず、`pnpm` へ置換してください。
-- PATH 上の `pnpm`（macOS Homebrew 環境では `/opt/homebrew/bin/pnpm` 等）を使用します。
+- `agy_tool_safety` の `absolute_path` 審査ロス（約1.8秒）を避けるため、通常は PATH 解決の素の `pnpm` を優先使用し、PATH 未解決の環境でのみ `/opt/homebrew/bin/pnpm` 等へフォールバックします。
 
 ### コマンド置換表
 
@@ -30,7 +30,7 @@ description: Enforce pnpm/uv and lockfile policy.
 
 ## Python (uv)
 
-- `pip install` / `pip3 install` / `python -m pip install` の直接実行は禁止です。`uv`（`/opt/homebrew/bin/uv`、`~/.local/bin/uv`、または PATH 上の `uv`）を使い、`uv add`、`uv sync --locked`、`uv run --locked`、または `uv pip compile` + `uv pip sync` に置換してください。
+- `pip install` / `pip3 install` / `python -m pip install` の直接実行は禁止です。PATH 解決の素の `uv`（PATH 未解決時は `/opt/homebrew/bin/uv` または `~/.local/bin/uv`）を使い、`uv add`、`uv sync --locked`、`uv run --locked`、または `uv pip compile` + `uv pip sync` に置換してください。
 - Python CLI ツールの一時実行は `uvx <tool>@<固定バージョン>` を優先してください。
 
 ## 既存プロジェクトの例外手順

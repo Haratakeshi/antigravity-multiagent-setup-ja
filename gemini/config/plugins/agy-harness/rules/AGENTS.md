@@ -16,6 +16,7 @@
 
 ## 5. Context Decay 対策
 - 独立タスクは適切に分割し成果物・検証結果・未解決事項を引き渡す。委譲閾値は `claude-orchestrator-kit` の損益分岐点に従い、明確な役割・成果物・検証条件を付与。
+- **状態ファイルの Dreaming（定期記憶統合・無欠損圧縮）**: `STATE.md` 等の累積状態ファイルが肥大化（目安 `20KB` 超、または日次締め時）した際は、①確定した因果知見を `Semantic Memory` 節へ昇格し、②直近ワーキング記憶のみ残して古いエピソードを月次アーカイブ（`archive/`）へ無欠損退避させ、単一 `read_file` 上限（`46KB`）未満・高信号密度を常時維持する。
 
 ## 6. Context Hierarchy
 - **第1階層**: `GEMINI.md`(§0〜§2) + plugin `rules/AGENTS.md`(§3〜§11)。 **第2階層**: `<project>/GEMINI.md` or `AGENTS.md`。 **第3階層**: `.agents/rules/*.md`（`trigger` 必須）。
@@ -26,7 +27,7 @@
 - **Custom Command** (`~/.gemini/commands/*.toml`) / **Subagent** (`~/.gemini/config/agents/` / `plugins/<p>/agents/`): ルールと詳細仕様を分離し二重管理を回避。
 
 ## 8. パッケージサプライチェーン対策
-- JS/TS は `pnpm`、Python は `uv` を優先使用。`npm`/`npx`/`pip` 直実行と `@latest` は禁止。
+- JS/TS は `pnpm`、Python は `uv` を優先使用（`agy_tool_safety` の `absolute_path` 審査を避けるため PATH 解決の素のコマンド名を優先し、PATH 未解決環境のみ `/opt/homebrew/bin/` や `~/.local/bin/` を参照）。`npm`/`npx`/`pip` 直実行と `@latest` は禁止。
 - 固定バージョン＋lockfile (`pnpm-lock.yaml` / `uv.lock`) で管理。既存の `package-lock.json` / `requirements.txt` 運用は尊重し、移行は合意後に実施。作業前に lockfile・`packageManager`・CI を確認。
 
 ## 10. 設定ファイルの配置と SSOT

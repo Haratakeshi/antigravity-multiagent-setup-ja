@@ -98,8 +98,31 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
     guard_cmd = scripts_dir / "guard_commands.py"
     for cmd_str, expected_decision in [
         ("pnpm test", "allow"),
+        ("rm -rf /tmp/agy_verify_tmp_ok", "allow"),
+        ("/bin/rm -rf /private/tmp/agy_verify_tmp_ok", "allow"),
+        ("mkdir -p /tmp/agy_verify_tmp_ok && rm -rf /tmp/agy_verify_tmp_ok/sub", "allow"),
+        ("git commit -m 'allow /tmp rm -rf'", "allow"),
         ("npm install lodash", "deny"),
+        ("schtasks /create /tn test", "deny"),
         ("rm -rf ./dist", "force_ask"),
+        ("/bin/rm -rf ./dist", "force_ask"),
+        ("\\rm -rf ./dist", "force_ask"),
+        ('"rm" -rf ./dist', "force_ask"),
+        ("rm ./important.txt", "force_ask"),
+        ("rm -rf /tmp/{a,..}/etc", "force_ask"),
+        ("rm -rf /tmp/[a-z]*", "force_ask"),
+        ("rm -rf /tmp/*", "force_ask"),
+        ("sh -c 'rm -rf ./dist' && rm -rf /tmp/ok", "force_ask"),
+        ("rm -rf /tmp/a &", "force_ask"),
+        ("find ./dist -delete", "force_ask"),
+        ("! rm -rf ./dist", "force_ask"),
+        ("{ rm -rf ./dist; }", "force_ask"),
+        ("if true; then rm -rf ./dist; fi", "force_ask"),
+        (">/dev/null rm -rf ./dist", "force_ask"),
+        ("=rm -rf ./dist", "force_ask"),
+        ("$'rm' -rf ./dist", "force_ask"),
+        ("{rm,-rf,./dist}", "force_ask"),
+        ("/bin/r? -rf ./dist", "force_ask"),
     ]:
         r = subprocess.run(
             [sys.executable, str(guard_cmd)],
@@ -113,6 +136,48 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
                 errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` -> got {out}, expected {expected_decision}")
         except Exception as e:
             errors.append(f"[HOOK_TEST_FAIL] guard_commands `{cmd_str}` invalid JSON: {e}")
+
+    guard_edit = scripts_dir / "guard_file_edits.py"
+    for tc_obj, expected_decision in [
+        ({"name": "delete_file", "args": {"Path": "/tmp/agy_verify_del_ok.txt", "toolSummary": "Clean temp"}}, "allow"),
+        ({"name": "delete_file", "args": {"Paths": ["/tmp/ok.txt", "./secret.txt"]}}, "force_ask"),
+        ({"name": "delete_file", "args": {"Path": "/tmp/{a,..}/secret.txt"}}, "force_ask"),
+    ]:
+        r_ed = subprocess.run(
+            [sys.executable, str(guard_edit)],
+            input=json.dumps({"toolCall": tc_obj}),
+            capture_output=True,
+            text=True,
+        )
+        try:
+            out_ed = json.loads(r_ed.stdout)
+            if out_ed.get("decision") != expected_decision:
+                errors.append(f"[HOOK_TEST_FAIL] guard_file_edits `{tc_obj}` -> got {out_ed}, expected {expected_decision}")
+        except Exception as e:
+            errors.append(f"[HOOK_TEST_FAIL] guard_file_edits `{tc_obj}` invalid JSON: {e}")
+
+    guard_url = scripts_dir / "guard_urls.py"
+    for url_str, expected_decision in [
+        ("http://localhost:3000/api", "allow"),
+        ("http://[::1]:3000/api", "allow"),
+        ("https://github.com/Haratakeshi/antigravity-multiagent-setup-ja", "allow"),
+        ("http://evil.example?x=.localhost", "ask"),
+        ("http://localhost:80@evil.example/pwn", "ask"),
+        ("https://evil.example\\.localhost/", "ask"),
+        ("HTTPS://evil.example/payload", "ask"),
+    ]:
+        r_u = subprocess.run(
+            [sys.executable, str(guard_url)],
+            input=json.dumps({"toolCall": {"name": "read_url_content", "args": {"Url": url_str}}}),
+            capture_output=True,
+            text=True,
+        )
+        try:
+            out_u = json.loads(r_u.stdout)
+            if out_u.get("decision") != expected_decision:
+                errors.append(f"[HOOK_TEST_FAIL] guard_urls `{url_str}` -> got {out_u}, expected {expected_decision}")
+        except Exception as e:
+            errors.append(f"[HOOK_TEST_FAIL] guard_urls `{url_str}` invalid JSON: {e}")
 
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
@@ -205,6 +270,24 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
         )
         if json.loads(rb.stdout).get("decision") != "continue":
             errors.append(f"[HOOK_TEST_FAIL] stop_selfreview unreviewed mutation expected continue, got {rb.stdout}")
+
+        # Case B2: Opt-out via AGY_SKIP_STOP_MARKER_GATE=1 -> allow
+        rb_skip = subprocess.run(
+            [sys.executable, str(stop_py)],
+            input=json.dumps({
+                "terminationReason": "NO_TOOL_CALL",
+                "fullyIdle": True,
+                "conversationId": "cid-mut-skip",
+                "transcriptPath": str(tp),
+                "artifactDirectoryPath": str(art_dir),
+                "workspacePaths": [str(ws_dir)],
+            }),
+            capture_output=True,
+            text=True,
+            env={**env, "AGY_SKIP_STOP_MARKER_GATE": "1"},
+        )
+        if json.loads(rb_skip.stdout).get("decision") != "allow":
+            errors.append(f"[HOOK_TEST_FAIL] stop_selfreview AGY_SKIP_STOP_MARKER_GATE=1 expected allow, got {rb_skip.stdout}")
 
         # Case C: Real file mutation WITH GOAL_COMPLETE -> allow
         tp.write_text(
@@ -320,6 +403,40 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
             )
             if json.loads(re_tracked.stdout).get("decision") != "allow":
                 errors.append(f"[HOOK_TEST_FAIL] stop_selfreview git-added binaries expected allow, got {re_tracked.stdout}")
+
+            # Delegated flash-runner + quoted/nested-.git untracked dir binaries -> continue
+            q_dir = bin_ws / 'dir "quoted" space'
+            q_dir.mkdir()
+            (q_dir / ".git").mkdir()
+            for idx_q in range(31):
+                (q_dir / f"item {idx_q}.gz").write_bytes(b"\x1f\x8b\x08\x00")
+            tp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "delegate gen"}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "content": "delegated <!-- GOAL_COMPLETE -->",
+                        "tool_calls": [{"name": "invoke_subagent", "args": {"TypeName": json.dumps("flash-runner")}}],
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            rf_delegated = subprocess.run(
+                [sys.executable, str(stop_py)],
+                input=json.dumps({
+                    "terminationReason": "NO_TOOL_CALL",
+                    "fullyIdle": True,
+                    "conversationId": "cid-bin-delegated",
+                    "transcriptPath": str(tp),
+                    "artifactDirectoryPath": str(art_dir),
+                    "workspacePaths": [str(bin_ws)],
+                }),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if json.loads(rf_delegated.stdout).get("decision") != "continue":
+                errors.append(f"[HOOK_TEST_FAIL] stop_selfreview delegated flash-runner binaries expected continue, got {rf_delegated.stdout}")
 
         # process-review-gate.mjs test (un-audited src/ edit -> continue; subagent+CHECKPOINT -> allow; Round-2 send_message audit -> allow)
         git_bin = shutil.which("git")

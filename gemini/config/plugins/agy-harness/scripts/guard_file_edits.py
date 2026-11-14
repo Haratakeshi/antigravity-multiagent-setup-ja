@@ -1,15 +1,87 @@
 #!/usr/bin/env python3
 # agy-harness: ファイル編集ガード (PreToolUse)
-# 1) ファイル削除ツールは force_ask (暗黙のデータ破棄対策)
+# 1) ファイル削除ツールは /tmp 配下の安全な具体パスを除き force_ask (暗黙のデータ破棄対策)
 # 2) テストファイルへの編集に「テストを都合よく通すためのパターン」を検出したら ask
 import json
+import os
 import re
 import sys
+
+FORBIDDEN_TMP_CHARS = frozenset("$`\n\r\x00~*?[]{}()\\|;&<>")
+PATH_KEY_RE = re.compile(r"(path|file|target|dir|uri|dest|source|src)", re.IGNORECASE)
+SAFE_DELETE_META_KEYS = frozenset({"toolsummary", "description", "reason", "summary"})
 
 
 def emit(obj):
     sys.stdout.write(json.dumps(obj, ensure_ascii=False))
     sys.exit(0)
+
+
+def _is_safe_tmp_path(raw_path: str | None) -> bool:
+    if not raw_path or any(c in FORBIDDEN_TMP_CHARS for c in raw_path):
+        return False
+    if not (raw_path.startswith("/tmp/") or raw_path.startswith("/private/tmp/")):
+        return False
+    parts = [p for p in raw_path.split("/") if p != ""]
+    if "." in parts or ".." in parts:
+        return False
+    if parts[0] == "tmp":
+        if len(parts) < 2:
+            return False
+        root_prefix = "/tmp"
+        sub_parts = parts[1:]
+    elif len(parts) >= 3 and parts[0] == "private" and parts[1] == "tmp":
+        root_prefix = "/private/tmp"
+        sub_parts = parts[2:]
+    else:
+        return False
+
+    tmp_root_real = os.path.realpath("/tmp")
+    deepest_existing = root_prefix
+    cur = root_prefix
+    for part in sub_parts:
+        cur = cur + "/" + part
+        if os.path.islink(cur):
+            return False
+        if os.path.exists(cur):
+            deepest_existing = cur
+
+    if os.path.exists(deepest_existing):
+        real_anc = os.path.realpath(deepest_existing)
+        if real_anc != tmp_root_real and not real_anc.startswith(tmp_root_real + os.sep):
+            return False
+    return True
+
+
+def _extract_delete_targets(args: dict) -> list[str] | None:
+    """Collect every target path from delete/remove tool args; return None on malformed/empty path values."""
+    targets: list[str] = []
+
+    def walk_value(val, require_valid_str: bool) -> bool:
+        if isinstance(val, str):
+            if not val:
+                return not require_valid_str
+            targets.append(val)
+            return True
+        if isinstance(val, (list, tuple)):
+            if require_valid_str and not val:
+                return False
+            return all(walk_value(item, require_valid_str) for item in val)
+        if isinstance(val, dict):
+            for k, v in val.items():
+                k_str = str(k)
+                if k_str.lower() in SAFE_DELETE_META_KEYS:
+                    continue
+                if not walk_value(v, bool(PATH_KEY_RE.search(k_str))):
+                    return False
+            return True
+        if isinstance(val, bool) or val is None:
+            return not require_valid_str
+        return not require_valid_str
+
+    if not walk_value(args, False):
+        return None
+    return targets if targets else None
 
 
 try:
@@ -22,7 +94,11 @@ except Exception:
 if not isinstance(tool_args, dict):
     emit({"decision": "allow"})
 
+# --- ファイル削除は /tmp 配下の安全な具体パスのみ allow、それ以外はすべて force_ask ---
 if re.search(r"delete|remove", tool_name, re.IGNORECASE):
+    del_targets = _extract_delete_targets(tool_args)
+    if del_targets and all(_is_safe_tmp_path(t) for t in del_targets):
+        emit({"decision": "allow"})
     emit({"decision": "force_ask",
           "reason": "ファイル削除です。対象がユーザー資産・生成物・一時ファイルのいずれか、復元手段の有無を確認してください。"})
 

@@ -1,19 +1,20 @@
 ---
 name: multi-agent-opinion
-description: Risk-scaled multi-agent clean-room review pipeline (Tier 1-3, 3-strike PDCA).
+description: Risk-scaled multi-agent clean-room review pipeline (Tier 0-3, 3-strike PDCA).
 ---
 
 # Multi-Agent Second Opinion Review Skill（リスク比例・複眼型セカンドオピニオン）
 
-コード実装・設計提案・3ストライク課題に対し、変更リスクと速度要件に応じた **Tier 1〜3 のスケーリング** で独立サブエージェント監査とマインドフルネス事実再検査を実行する標準パイプラインです。各専門エージェントのプロンプト正本（SSOT）は `~/.gemini/config/plugins/multi-agent-kit/agents/*.md` に格納されており、本ファイルには重複記載しません。
+コード実装・設計提案・3ストライク課題に対し、変更リスクと速度要件に応じた **Tier 0〜3 の4段階スケーリング** で独立サブエージェント監査とマインドフルネス事実再検査を実行する標準パイプラインです。各専門エージェントのプロンプト正本（SSOT）は `~/.gemini/config/plugins/multi-agent-kit/agents/*.md` に格納されており、本ファイルには重複記載しません。
 
 ---
 
-## 0. リスク・速度比例スケーリング（Tier 1〜3）と設定値
+## 0. リスク・速度比例スケーリング（Tier 0〜3）と設定値
 
 | Tier | 適用場面 | 起動構成 | トークン・時間負荷 |
 |---|---|---|---|
-| **Tier 1（日常既定）** | 小〜中規模の通常実装・バグ修正・単一モジュール変更 | 通常は高速な `second-opinion-lite`（Flash並列読取・1〜2分）、重要状態遷移・視覚判定・リリース直前は `carbon-verifier`（`Model: "inherit"`, 12往復上限） | 極小 |
+| **Tier 0（日常既定）** | 軽微〜通常の実装・バグ修正・設定調整 | メインエージェント自身の差分確認＋テスト実行＋`§0.5` セルフレビューのみで即時完了（監査サブエージェント自動起動なし） | ゼロ |
+| **Tier 1（中規模・明示依頼）** | 中規模以上のロジック変更・明示的なセカンドオピニオン依頼 | 通常は高速な `second-opinion-lite`（Flash並列読取・1〜2分）、重要状態遷移・視覚判定・リリース直前は `carbon-verifier`（`Model: "inherit"`, 12往復上限） | 極小 |
 | **Tier 2（標準 `multi-agent-opinion`）** | 共有状態・認証・API契約・状態遷移・複数モジュール変更 | Stage 1 **ドメイン選抜 3〜6体**（`Model: "flash"`）＋ Stage 2（再検査＋関連監査1〜2体） | 中 |
 | **Tier 3（フルゲート）** | リリース前最終監査 / 明示的な「フル15体」指定 / **モードB（3ストライク）** | Stage 1 **全15体**（`Model: "flash"`）＋ Stage 2 **全3体** | 大（ここぞの場面のみ） |
 
@@ -59,7 +60,7 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
 ## 3. 実行ステップ
 
 ### ステップ 1: 対象抽出と機密マスク（モード A）
-- `.env*`, `*.pem`, `*.key`, `*secret*` 等の機密ファイルを除外し、トークン・鍵文字列は `[REDACTED]` に置換して `<appDataDir>/brain/<conversation-id>/scratch/` に保存します。差分が空なら即時終了します。
+- `.env*`, `*.pem`, `*.key`, `*secret*` 等の機密ファイルを除外し、トークン・鍵文字列は `[REDACTED]` に置換して `<appDataDir>/brain/<conversation-id>/scratch/`（または `/tmp/`）に保存します。差分が空なら即時終了します。
 
 ### ステップ 2: ステージ1並行起動 (`invoke_subagent`, `Model: "flash"`)
 - Tier 2（選抜3〜6体）または Tier 3（全15体）を並行起動し、`schedule(DurationSeconds=180, TimerCondition="never")` を設定します。
@@ -83,4 +84,4 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
 1. 実行主体自身の artifact ディレクトリ（`<appDataDir>/brain/<実行中のconversation-id>/second_opinion_report.md`, `ArtifactMetadata` 付き）へ `write_to_file` で出力します（※Antigravity v2.30+ ではサブエージェントから親の `brain/` ディレクトリへの書き込みはエラーになるため、サブエージェント自身の `brain/<subagent-id>/` に保存して絶対パスを親へ共有します）。
    - 構成: `1. Executive Summary` / `2. CONFIRMED Findings` / `3. Combinatorial & Architecture Risks` / `4. UNVERIFIED` / `5. REJECTED (反証根拠つき)` / `6. Action Queue`。
 2. **最優先通知**: クリーンアップコマンドより前に、必ず `send_message` で親へ5行以内の要約とレポート絶対パスを送信します。
-3. **安全な後始末**: バックグラウンドでの `rm -f` / `rm -rf` は `guard_commands.py` の `force_ask` により永久停止するため使用厳禁。scratch ファイル破棄は空文字上書き（`Overwrite: true`）またはオプションなし `rm <絶対パス>` を使用し、`manage_subagents(Action="kill_all")` で子エージェントを終了します。
+3. **安全な後始末**: `/tmp/<具体名>` 以外のパスに対する `rm` は `guard_commands.py` の `force_ask` によりバックグラウンドで停止するため、`brain/.../scratch/` 配下の一時ファイル破棄は空文字上書き（`Overwrite: true`）を使用し（`/tmp/<具体名>` 配下のみ `rm -rf /tmp/<具体名>` が自動許可されます）、`manage_subagents(Action="kill_all")` で子エージェントを終了します。

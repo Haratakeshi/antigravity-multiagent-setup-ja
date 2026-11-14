@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![PRs: Not Accepted (Fork Friendly)](https://img.shields.io/badge/PRs-Not%20Accepted%20(Fork%20Friendly)-orange.svg)](./CONTRIBUTING.md)
-[![Antigravity: v2.30+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Carbon%20Optimized%20v1.3-4285F4.svg)](#-v13-アップデート-gemini-4-carbon-高速化省トークン最適化)
+[![Antigravity: v2.30+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Carbon%20Optimized%20v1.4-4285F4.svg)](#-v14-アップデート-ハーネス高速チューニング--tmp-安全削除対応)
 
-Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks）**、**リスク比例 Tier 1〜3 複眼セカンドオピニオン（3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Carbon / Flash / Claude のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
+Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Carbon / Flash / Claude のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
 
 > [!NOTE]
 > **📖 オープン公開ポリシー（閲覧・利用・Fork 自由 / PR 受付なし）**
@@ -12,23 +12,21 @@ Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・�
 
 ---
 
-## 🆕 v1.3 アップデート: Gemini 4 Carbon 高速化・省トークン最適化
+## 🆕 v1.4 アップデート: ハーネス高速チューニング ＆ `/tmp` 安全削除対応
 
-実稼働トランスクリプト91件と Language Server ログのプロファイリングに基づき、安全境界と品質規律を一切削らずに **トークン消費量と体感待ち時間を大幅削減するアップデート** を反映しました：
+Language Server 内部の安全審査（`agy_tool_safety` / `sir_flash_lite`）の実測解析とクリーンルーム反証監査に基づき、**日常開発の Allow 確認待ち・サブエージェント過剰起動・外付け SSD 走査ロスを徹底排除する高速アップデート**を反映しました（v1.3 の Internal-First PAC・常時ルール `-50%` 圧縮もすべて包含）：
 
-1. **Internal-First PAC 化（出力トークン中央値 `-59.4%` 削減）**:
-   - 毎ステップの定型宣言（`目的 / 予測 / 照合: OK`）による「二重 CoT 課金」を廃止し、通常推論を `<thought>` に一本化。可視出力は **高シグナル4地点**（①着手前の前提検証、②サプライズ発生時、③Human Gate、④完了前セルフレビュー）のみに集中。
-2. **常時ロード5ルールの高密度ダイエット（`40KB → 約19.8KB`, `-50%+` 圧縮）**:
-   - 全23サブエージェントにも注入されるルール群を半分以下に圧縮し、プロンプトキャッシュ効率（実測 `98.4%`）と初動速度を改善。
-3. **Carbon レイテンシ最適化規律 ＆ 並列バッチ読取の徹底**:
-   - Carbon の固定 TTFT（7〜20秒/手）が累積する「1ファイル1ターンの逐次ループ」を禁止し、**1ターン複数並列ツール発行**（監査役は1ターン5〜15ファイル一括読取・往復上限つき）を徹底。
-   - **損益分岐点（Break-Even）委譲基準**: 3ファイル以内の読取・10秒以内の単発コマンドはメイン Carbon が直接実行し、重いビルド/全テスト・4ファイル以上の広域調査のみ Flash へ委譲。
-   - 内部 Safety Monitor の同期 LLM 審査（`+1.5〜7秒`）を誘発する不要な複合シェル演算子（`&&`, `;`, `|`）の回避、および `150k tokens` 到達時の `/compact` 指針を明文化。
-4. **リスク・速度比例の 3段階レビュースケーリング（Tier 1〜3）**:
-   - 毎回15体をフル起動せず、**Tier 1**（日常: 高速な `second-opinion-lite` / 重要箇所は `carbon-verifier`）、**Tier 2**（重要変更: ドメイン選抜 3〜6体＋Stage 2）、**Tier 3**（リリース前・3ストライク時: フル 15+3体）を自動使い分け。
-5. **Antigravity v2.30+ スマート Stop Hooks ＆ 未追跡バイナリ放置ガード**:
-   - 質問応答・調査のみ（実ファイル変更なし）の会話や、既に `<!-- GOAL_COMPLETE -->` 出力済みの応答では無駄な引き止めターンを発生させず即時 `allow` 素通し化。`transcript.jsonl` の二重クォート引数展開および Round 2 `send_message` 再監査の自動認識にも対応。
-   - コミット済みバイナリ（画像・音声・配布データ等）は一切妨げず、スクリプト等で**未追跡（`??`）のまま大量放置されたバイナリ/圧縮ファイル（30件以上）**のみを検知し、Language Server の UTF-8 差分生成ストームを未然に防止。
+1. **リスク・速度比例の 4段階レビュースケーリング（Tier 0〜3）**:
+   - 日常・軽微〜通常の変更は **Tier 0（メイン自身の差分・テスト確認＋`§0.5` セルフレビューで即時完了、監査サブエージェント自動起動なし）** を既定化し、毎回の強制監査ターン待ちを解消。
+   - 中規模変更・明示依頼時は **Tier 1**（`second-opinion-lite` / `carbon-verifier`）、重要領域は **Tier 2**（選抜 3〜6体＋Stage 2）、リリース前・3ストライク時は **Tier 3**（フル 15+3体）へ段階スケール。
+2. **15ファイル並列バッチ読取 ＆ `agy_tool_safety` 高速パス規律**:
+   - 審査 `0ms`（`allowed_tool`）で通るネイティブ `read_file` / `grep` のメイン直接並列バッチ上限を **`3ファイル → 15ファイル`**（他プロジェクト横断含む）へ拡大し、`16ファイル以上` または独立3軸以上の大規模調査のみ `flash-investigator` へ委譲。
+   - `run_command` での不要な絶対パス指定（`/opt/homebrew/bin/pnpm` 等 → `absolute_path` 審査 `+1.8s`）や複合演算子（`&&`, `;`, `|` → `unquoted_shell_operators` 審査）を回避し、PATH 解決の素の `pnpm` / `uv` / `git` を優先。
+3. **`/tmp` 限定 `rm`・削除の安全な自動許可 ＆ ローカル URL 素通し**:
+   - `guard_commands.py` と `guard_file_edits.py` で、`/tmp/<具体名>`（および `/private/tmp/<具体名>`）のみを対象とする `rm` / `delete_file` を確認なしで自動 `allow` 化。一方で `/bin/rm`・`\rm`・フラグなし `rm`・ブレース展開（`/tmp/{a,..}`）・ワイルドカード全消去（`/tmp/*`, `/tmp/[a-z]*`）・シンボリックリンク越境・シェルラッパー（`sh -c` 等）はすべて厳密検知して `force_ask` に落とすゼロバイパス設計。
+   - `guard_urls.py` を RFC 準拠の `urlsplit` 検証に刷新し、`localhost` / `127.0.0.1` / `[::1]` / `*.localhost` / `*.local` および主要クラウド・フレームワーク公式ドメインを自動許可しつつ、`?` / `#` / `userinfo@` / `\` 偽装 URL を確実にブロック。プロジェクト固有ドメイン用の `~/.gemini/config/allowed_domains.local.txt` にも対応。
+4. **外付け SSD 環境でも高速なスマート Stop Hook (`stop_selfreview.py`)**:
+   - `git --no-optional-locks status --porcelain -z -unormal` ＋ 上限付きディレクトリ走査により、大規模リポジトリや外付け SSD 上でも数十ミリ秒で未追跡バイナリ大量放置（`flash-runner` 経由や特殊文字パス含む）を検知。Q&A・調査のみ、および `<!-- GOAL_COMPLETE -->` 出力済みターンは追加ターンゼロで即時素通し。
 
 **既存環境からのアップデート方法**（初回導入時のバックアップベースラインはそのまま安全に保持されます）：
 ```bash
@@ -94,8 +92,8 @@ flowchart TB
 
     subgraph L3["3. 適応型オーケストレーション & 専門ワークフロー"]
         GM["grill-me / grilling\n(9ステップ要件合意・1項目1Ask・2段階反証)"]
-        MA["Mode A/B/C オーケストレーション\n(損益分岐点委譲・並列ツールバッチ・TTFT最小化)"]
-        MAO["Tier 1〜3 リスク比例監査 (3-Strike PDCA)\n(高速Lite/Carbon ⇔ 選抜3〜6体 ⇔ フル15+3体)"]
+        MA["Mode A/B/C オーケストレーション\n(15ファイル並列バッチ・agy_tool_safety回避・TTFT最小化)"]
+        MAO["Tier 0〜3 リスク比例監査 (3-Strike PDCA)\n(日常セルフ確認 ⇔ 高速Lite/Carbon ⇔ 選抜3〜6体 ⇔ フル15+3体)"]
     end
 
     L1 --> L2 --> L3
@@ -119,7 +117,7 @@ flowchart TB
 | プラグイン名 | 役割・主な機能 | 同梱スキル / サブエージェント |
 |---|---|---|
 | **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview`） |
-| **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 1〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
+| **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
 | **`multi-axis-investigation-kit`** | 1つの発見で探索を止めない直交多軸調査・内外両面観測・反証チェック | スキル: `multi-axis-investigation` |
 | **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と軍師・出口監査ゲート | スキル: `ask-opus`, `claude-exit-review`<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
 
@@ -138,8 +136,8 @@ flowchart TB
 `claude-orchestrator-kit` は、あなたが Antigravity のモデルピッカーで選んだメインモデルに合わせて自動で立ち回りを切り替えます：
 
 - **Mode A: `Gemini 4 Carbon`（または `Argon`）選択時【主力推奨】**
-  - **メイン（Carbon 直接実行）**: 要件分解・設計判断・コアロジック実装・**3ファイル以内の読取/grep**・**10秒以内の単発コマンド**・スクリーンショット最終目視判定を直接高速処理（1ターン並列ツールバッチ必須）。
-  - **Flash ワーカー群**: 長大ログのフルビルド・全テスト実行（`flash-runner`）、**4ファイル以上/複数軸の並列コード調査**（`flash-investigator`）、スコープ明確な定型実装（`flash-implementer`）へ委譲し、Carbon の思考トークン浪費と待ち時間（TTFT）を最小化。
+  - **メイン（Carbon 直接実行）**: 要件分解・設計判断・コアロジック実装・**15ファイル以内（他プロジェクト横断含む）の並列 `read_file`/`grep`**・**10秒以内の単発コマンド**・スクリーンショット最終目視判定を直接高速処理（1ターン5〜15件並列ツールバッチ推奨）。
+  - **Flash ワーカー群**: 長大ログのフルビルド・全テスト実行（`flash-runner`）、**16ファイル以上または独立3軸以上の広域並列調査**（`flash-investigator`）、スコープ明確な定型実装（`flash-implementer`）へ委譲し、Carbon の思考トークン浪費と待ち時間（TTFT）を最小化。
 - **Mode B: `Gemini Flash` 選択時**
   - 日常の軽微な改修や単発タスクをサブエージェント起動オーバーヘッドなしで最速直接実行。難所のみ `Model: "pro"` で上位サブエージェントを召喚。
 - **Mode C: `Claude`（Antigravity 内蔵 Opus / Sonnet）選択時**
