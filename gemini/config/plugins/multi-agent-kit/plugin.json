@@ -1,8 +1,8 @@
 {
   "name": "multi-agent-kit",
-  "displayName": "Multi-Agent Opinion Kit (Tier 1〜3 リスク比例複眼監査 & PDCA)",
-  "version": "1.3.0",
-  "description": "監査独立性規律 (§3)、変更リスクに応じた Tier 1〜3 スケーリング（日常高速監査 / ドメイン選抜3〜6体 / リリース前フル15+3体）による 3-Strike PDCA パイプライン (multi-agent-opinion)、固着打破の事実観察 (mindfulness)、視覚ゼロトレランス検証 (visual-verification-loop) を提供します。",
+  "displayName": "Multi-Agent Opinion Kit (Tier 0〜3 リスク比例複眼監査 & PDCA)",
+  "version": "1.5.0",
+  "description": "監査独立性規律 (§3)、変更リスクに応じた Tier 0〜3 スケーリング（軽微変更即時完了 / 実装出口ゲート / ドメイン選抜3〜6体 / リリース前フル15+3体）による 3-Strike PDCA パイプライン (multi-agent-opinion)、固着打破の事実観察 (mindfulness)、視覚ゼロトレランス検証 (visual-verification-loop) を提供します。",
   "author": {
     "name": "Haratakeshi",
     "url": "https://github.com/Haratakeshi"

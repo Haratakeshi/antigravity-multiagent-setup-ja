@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![PRs: Not Accepted (Fork Friendly)](https://img.shields.io/badge/PRs-Not%20Accepted%20(Fork%20Friendly)-orange.svg)](./CONTRIBUTING.md)
-[![Antigravity: v2.30+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Carbon%20Optimized%20v1.4-4285F4.svg)](#-v14-アップデート-ハーネス高速チューニング--tmp-安全削除対応)
+[![Antigravity: v2.30+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Carbon%20Optimized%20v1.5-4285F4.svg)](#-v15-アップデート-smart-出口反証ゲート--zero-tax-3層無限ループ防衛--claude-fable-52-統合)
 
-Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Carbon / Flash / Claude のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
+Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Carbon / Flash / Claude Fable 5.2 のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
 
 > [!NOTE]
 > **📖 オープン公開ポリシー（閲覧・利用・Fork 自由 / PR 受付なし）**
@@ -12,29 +12,29 @@ Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・�
 
 ---
 
-## 🆕 v1.4 アップデート: ハーネス高速チューニング ＆ `/tmp` 安全削除対応
+## 🆕 v1.5 アップデート: Smart 出口反証ゲート ＆ Zero-Tax 3層無限ループ防衛 ＆ Claude Fable 5.2 統合
 
-Language Server 内部の安全審査（`agy_tool_safety` / `sir_flash_lite`）の実測解析とクリーンルーム反証監査に基づき、**日常開発の Allow 確認待ち・サブエージェント過剰起動・外付け SSD 走査ロスを徹底排除する高速アップデート**を反映しました（v1.3 の Internal-First PAC・常時ルール `-50%` 圧縮もすべて包含）：
+実稼働20時間テレメトリ観測とクリーンルーム反証監査に基づき、**オーケストレーター実装後の監査漏れゼロ化・無限ループ自動遮断・外部 Claude スキルの Fable 5.2 最高性能統一**を反映しました（v1.4 の高速パス・`/tmp` 安全削除対応もすべて包含）：
 
-1. **リスク・速度比例の 4段階レビュースケーリング（Tier 0〜3）**:
-   - 日常・軽微〜通常の変更は **Tier 0（メイン自身の差分・テスト確認＋`§0.5` セルフレビューで即時完了、監査サブエージェント自動起動なし）** を既定化し、毎回の強制監査ターン待ちを解消。
-   - 中規模変更・明示依頼時は **Tier 1**（`second-opinion-lite` / `carbon-verifier`）、重要領域は **Tier 2**（選抜 3〜6体＋Stage 2）、リリース前・3ストライク時は **Tier 3**（フル 15+3体）へ段階スケール。
-2. **15ファイル並列バッチ読取 ＆ `agy_tool_safety` 高速パス規律**:
-   - 審査 `0ms`（`allowed_tool`）で通るネイティブ `read_file` / `grep` のメイン直接並列バッチ上限を **`3ファイル → 15ファイル`**（他プロジェクト横断含む）へ拡大し、`16ファイル以上` または独立3軸以上の大規模調査のみ `flash-investigator` へ委譲。
-   - `run_command` での不要な絶対パス指定（`/opt/homebrew/bin/pnpm` 等 → `absolute_path` 審査 `+1.8s`）や複合演算子（`&&`, `;`, `|` → `unquoted_shell_operators` 審査）を回避し、PATH 解決の素の `pnpm` / `uv` / `git` を優先。
-3. **`/tmp` 限定 `rm`・削除の安全な自動許可 ＆ ローカル URL 素通し**:
-   - `guard_commands.py` と `guard_file_edits.py` で、`/tmp/<具体名>`（および `/private/tmp/<具体名>`）のみを対象とする `rm` / `delete_file` を確認なしで自動 `allow` 化。一方で `/bin/rm`・`\rm`・フラグなし `rm`・ブレース展開（`/tmp/{a,..}`）・ワイルドカード全消去（`/tmp/*`, `/tmp/[a-z]*`）・シンボリックリンク越境・シェルラッパー（`sh -c` 等）はすべて厳密検知して `force_ask` に落とすゼロバイパス設計。
-   - `guard_urls.py` を RFC 準拠の `urlsplit` 検証に刷新し、`localhost` / `127.0.0.1` / `[::1]` / `*.localhost` / `*.local` および主要クラウド・フレームワーク公式ドメインを自動許可しつつ、`?` / `#` / `userinfo@` / `\` 偽装 URL を確実にブロック。プロジェクト固有ドメイン用の `~/.gemini/config/allowed_domains.local.txt` にも対応。
-4. **外付け SSD 環境でも高速なスマート Stop Hook (`stop_selfreview.py`)**:
-   - `git --no-optional-locks status --porcelain -z -unormal` ＋ 上限付きディレクトリ走査により、大規模リポジトリや外付け SSD 上でも数十ミリ秒で未追跡バイナリ大量放置（`flash-runner` 経由や特殊文字パス含む）を検知。Q&A・調査のみ、および `<!-- GOAL_COMPLETE -->` 出力済みターンは追加ターンゼロで即時素通し。
+1. **スマート出口反証ゲート付きの 4段階レビュースケーリング（Tier 0〜3 & Smart `process-review-gate.mjs` v1.5 標準導入）**:
+   - 文書・設定・CSS・単一コード`25行未満`の微修正（実装委譲なし・空 `catch` なし）は **Tier 0（メイン自身の差分・テスト確認＋`§0.5` セルフレビューで即時完了）** として 0 秒素通し。
+   - **`flash-implementer` 等への実装委譲後**、またはプロダクトコード **`2ファイル以上` / 追加・変更 `25行以上`**（同一ターン内 `git commit` 含む）の通常実装時は **Tier 1 必須出口ゲート**（通常ロジックは高速な `second-opinion-lite`、状態遷移・認証・決済・視覚判定は `carbon-verifier` または `claude-exit-review`）を機械的にも強制し、複数行空 `catch {}` の混入も `-U3` hunk 比較で即座にブロック。
+2. **Zero-Tax 3層 Anti-Hang（Tasks / Subagent 無限ループ・対話待ち防衛）**:
+   - **第1層（`guard_commands.py` 事前 `deny`）**: 非デーモン実行での `vitest`（`run` 欠落・watch）・`jest --watch`・`playwright --ui/--debug`・`pytest --pdb`・`tail -f` を実行前にブロックし単発コマンドを案内。
+   - **第2層（プロセス内ハード上限 §9.4）**: 新規・一時検証スクリプト（`.py`/`.mjs`）に `faulthandler.dump_traceback_later(60, exit=True)` / `setTimeout(..., 60000).unref()` の自己終了タイマーを組み込み、無限ループ時も孤児プロセスを残さず即座に親を起こす。
+   - **第3層（実測 `p90` 基準・個別 ID 限定の適応型バックオフ監視）**: 長時間背景 Task・重厚 Subagent 起動時のみ個別の `TimerCondition="<TaskId>"` / `"<conversationId>"` で段階監視し、平時トークン税ゼロを維持。
+3. **外部 Claude CLI 連携スキルの Claude Fable 5.2 (`claude-fable-5-2`) 完全統一**:
+   - 軍師・設計相談スキルを **`ask-fable`**（旧 `ask-opus`）へ刷新し、出口反証 **`claude-exit-review`** および Stage 2 再検査 **`sonnet_inspect.py`** とともに最高性能の **`claude-fable-5-2`** を既定モデル化（外部 `claude` CLI 未導入環境では従来通り内蔵サブエージェントへ自動フォールバック）。
+4. **15ファイル並列バッチ読取 ＆ `agy_tool_safety` 高速パス ＆ `/tmp` 安全削除・外付けSSD高速 Stop Hook**:
+   - 審査 `0ms` のネイティブ `read_file` / `grep` 15ファイル並列バッチ、素の `pnpm` / `uv` / `git -C` 単発実行（`cd <dir> &&` や不要な絶対パス審査の排除）、`inheritCustomizations: false` サブエージェントへの高速パス規律直接注入、`/tmp/<具体名>` 限定の安全な自動削除許可、および24時間周期の状態ファイル自動 GC を完備。
 
 **既存環境からのアップデート方法**（初回導入時のバックアップベースラインはそのまま安全に保持されます）：
 ```bash
 cd antigravity-multiagent-setup-ja
 git pull
 python3 scripts/install.py
-# process-review-gate や Claude Code 用 grilling も導入済みの場合は:
-# python3 scripts/install.py --with-process-gate --with-claude-skills
+# Claude Code 用 grilling スキルも同期する場合:
+# python3 scripts/install.py --with-claude-skills
 ```
 
 ---
@@ -60,11 +60,11 @@ python3 scripts/install.py --check
 # 2. ドライラン確認（書き込みなし）
 python3 scripts/install.py --dry-run
 
-# 3. インストール実行（既存の ~/.gemini 設定は ~/.gemini/backups/setup-baseline/ に自動退避されます）
+# 3. インストール実行（既存の ~/.gemini 設定は ~/.gemini/backups/setup-baseline/ に自動退避され、Node.js があれば Smart process-review-gate も自動導入されます）
 python3 scripts/install.py
 
-# オプション: Node.js 製の src/ 監査ゲート + Claude Code 用 grilling スキルも同時導入する場合
-python3 scripts/install.py --with-process-gate --with-claude-skills
+# オプション: Claude Code 用 grilling スキルも同時導入する場合（process-review-gate を除外したい場合は --without-process-gate）
+python3 scripts/install.py --with-claude-skills
 ```
 
 - **再起動不要**: `~/.gemini/config/plugins/` への配置により、次のターンから自動でロードされます。
@@ -108,7 +108,7 @@ flowchart TB
 ### 1. コア憲法 (`gemini/GEMINI.md`)
 | 節 | 内容 |
 |---|---|
-| **§0 Reasoning Protocol** | Internal-First PAC（高シグナル4地点開示）、サプライズの昇格、**3ストライク視点リセット**（`mindfulness` → `ask-opus`/`senior-architect-advisor` または `multi-agent-opinion` モードB）、着手前の前提検証、証拠出自に基づく確信度校正、完了前セルフレビュー |
+| **§0 Reasoning Protocol** | Internal-First PAC（高シグナル4地点開示）、サプライズの昇格、**3ストライク視点リセット**（`mindfulness` → `ask-fable`/`senior-architect-advisor` または `multi-agent-opinion` モードB）、着手前の前提検証、証拠出自に基づく確信度校正、完了前セルフレビュー |
 | **§1 Output Discipline** | 自己評価の証拠義務（コマンド＋exit code / `file:line`）、機能ベースの役割名、迎合抑止（疑問文の中立解釈） |
 | **§2 Side-Effect Boundary** | 書き込み境界、不可逆・外部送信操作の Human Gate（`pending_human_review`）、Chrome 144+ DevTools 直結デッドロック禁止 |
 
@@ -119,7 +119,7 @@ flowchart TB
 | **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview`） |
 | **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
 | **`multi-axis-investigation-kit`** | 1つの発見で探索を止めない直交多軸調査・内外両面観測・反証チェック | スキル: `multi-axis-investigation` |
-| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と軍師・出口監査ゲート | スキル: `ask-opus`, `claude-exit-review`<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
+| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と軍師・出口監査ゲート | スキル: `ask-fable`, `claude-exit-review`<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
 
 ### 3. 日常ワークフロー単体スキル (`gemini/config/skills/` & `tools/`)
 
@@ -151,9 +151,9 @@ flowchart TB
 
 | 機能・スキル | 外部ツール導入済み環境の挙動 | 外部ツール未導入環境の自動代替挙動 |
 |---|---|---|
-| **`ask-opus`**（軍師・設計相談） | 外部 `claude` CLI 経由で Claude Opus に読み取り専用相談 | 内蔵サブエージェント **`senior-architect-advisor`** を起動（メインが内蔵 Opus/Sonnet/Carbon なら `Model: "inherit"`、Flash なら `Model: "pro"`） |
-| **`claude-exit-review`**（出口反証監査） | 外部 `claude` CLI 経由で Claude Sonnet が差分＋画像を監査 | 内蔵サブエージェント **`carbon-verifier`** を起動し、同じクリーンルーム条件で差分＋画像を高速バッチ監査 |
-| **`multi-agent-opinion` Stage 2** | `sonnet_inspect.py` で Claude Sonnet が指摘を再検査 | 内蔵サブエージェント **`mindfulness-inspector`** が指摘を `file:line` 照合し `CONFIRMED / UNVERIFIED / REJECTED` に分類 |
+| **`ask-fable`**（軍師・設計相談） | 外部 `claude` CLI 経由で Claude Fable 5.2 (`claude-fable-5-2`) に読み取り専用相談 | 内蔵サブエージェント **`senior-architect-advisor`** を起動（メインが内蔵 Opus/Sonnet/Carbon なら `Model: "inherit"`、Flash なら `Model: "pro"`） |
+| **`claude-exit-review`**（出口反証監査） | 外部 `claude` CLI 経由で Claude Fable 5.2 (`claude-fable-5-2`) が差分＋画像を監査 | 内蔵サブエージェント **`carbon-verifier`** を起動し、同じクリーンルーム条件で差分＋画像を高速バッチ監査 |
+| **`multi-agent-opinion` Stage 2** | `sonnet_inspect.py` で Claude Fable 5.2 (`claude-fable-5-2`) が指摘を再検査 | 内蔵サブエージェント **`mindfulness-inspector`** が指摘を `file:line` 照合し `CONFIRMED / UNVERIFIED / REJECTED` に分類 |
 | **ブラウザ確認・画面撮影** | `cdp-relay`（ログイン済み Chrome/Edge セッション中継） | Antigravity 標準内蔵の **`browser` サブエージェント** または Playwright ヘッドレス実行へ自動切替（※デッドロックする `chrome_devtools` 直結は常時ブロック） |
 
 詳細は [docs/CUSTOMIZATION_GUIDE.md](./docs/CUSTOMIZATION_GUIDE.md) をご覧ください。

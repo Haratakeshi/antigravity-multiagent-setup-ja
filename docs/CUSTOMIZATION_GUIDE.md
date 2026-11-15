@@ -9,14 +9,14 @@
 本セットアップは **Claude Code がインストールされていない PC でも 100% 動作** します。
 
 ### 仕組み
-`ask_opus.py`、`exit_review.py`、`sonnet_inspect.py` は実行時に以下の順序で `claude` バイナリを自動探索します：
+`ask_fable.py`、`exit_review.py`、`sonnet_inspect.py` は実行時に以下の順序で `claude` バイナリを自動探索します：
 1. 環境変数 `CLAUDE_CLI_PATH`
 2. `PATH` 上の `claude` (`shutil.which("claude")`)
 3. `~/.local/bin/claude`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude`, Windows 標準パス
 
 もし見つからない場合（または未ログインの場合）、スクリプトはクラッシュせず `exit code 2` と `[FALLBACK_TO_NATIVE_SUBAGENT]` 指示を返し、Antigravity エージェントは自動的に以下の **Antigravity 内蔵サブエージェント** を起動します：
 
-- `ask-opus` ➔ **`senior-architect-advisor`** サブエージェント
+- `ask-fable` ➔ **`senior-architect-advisor`** サブエージェント
 - `claude-exit-review` ➔ **`carbon-verifier`** サブエージェント
 - `multi-agent-opinion` Stage 2 ➔ **`mindfulness-inspector`** サブエージェント
 

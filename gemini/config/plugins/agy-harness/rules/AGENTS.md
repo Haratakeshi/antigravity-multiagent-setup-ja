@@ -27,8 +27,14 @@
 - **Custom Command** (`~/.gemini/commands/*.toml`) / **Subagent** (`~/.gemini/config/agents/` / `plugins/<p>/agents/`): ルールと詳細仕様を分離し二重管理を回避。
 
 ## 8. パッケージサプライチェーン対策
-- JS/TS は `pnpm`、Python は `uv` を優先使用（`agy_tool_safety` の `absolute_path` 審査を避けるため PATH 解決の素のコマンド名を優先し、PATH 未解決環境のみ `/opt/homebrew/bin/` や `~/.local/bin/` を参照）。`npm`/`npx`/`pip` 直実行と `@latest` は禁止。
+- JS/TS は `pnpm`、Python は `uv` を使用（`agy_tool_safety` の `absolute_path` 審査 1.8秒を避けるため PATH 解決の素のコマンド名を優先し、PATH 未解決環境のみ `/opt/homebrew/bin/` や `~/.local/bin/` を参照）。`npm`/`npx`/`pip` 直実行と `@latest` は禁止。
 - 固定バージョン＋lockfile (`pnpm-lock.yaml` / `uv.lock`) で管理。既存の `package-lock.json` / `requirements.txt` 運用は尊重し、移行は合意後に実施。作業前に lockfile・`packageManager`・CI を確認。
+
+## 9. ツール実行高速化規律 (Safety Fast-Path & Batching)
+- **9.1 シェル複合演算子・`cd &&` の排除**: `run_command` での未クォート複合演算子（`&&`, `||`, `;`, `|`）は `unquoted_shell_operators` 同期審査（`+1.7秒/回`）を誘発するため原則避け、別ディレクトリ実行は `cd <dir> && ...` ではなく `git -C <dir>`・`pnpm --dir <dir>`・`uv --directory <dir>` 等の単発コマンドを使う。
+- **9.2 ネイティブ読取ツールの優先**: ファイル内容・一覧・検索に `run_command`（`ls`, `grep`, `cat`, `head`, `tail`, `find`, `python3 -c` 等 → `unknown_command` 審査 `+1.8秒/回`）を使わず、審査 `0ms`（`allowed_tool`）の `read_file` / `grep` / `list_dir` を1ターン並列バッチ（5〜15件）で呼ぶ。
+- **9.3 ファイル編集の並列バッチ化**: 独立した複数箇所・複数ファイルの `edit_file` / `write_file` は1手1件で逐次ループせず、1ターンで並列発行（同一ファイル近接箇所は1回の `edit_file` に統合）して内部審査時間を並列隠蔽する。
+- **9.4 無限ループ・対話待ちの事前遮断 (Zero-Tax Anti-Hang)**: 非デーモン実行時は `WaitMsBeforeAsync: 10000`（10秒同期待機）を優先して不要な背景化を防ぎ、テストランナーは素の `pnpm` / `uv` 先頭のまま非対話・上限引数（`vitest run --testTimeout=30000`, `playwright test --timeout=30000`, `jest --ci`, `pytest`）を明示する（`CI=true` 先頭付与は `unallowed_env_var` 審査 `+1.75秒` を招くため避ける）。ループや外部待機を含む新規・一時検証スクリプト（`scratch/*.py`, `*.mjs` 等）には、プロセス内ハード上限（Python: `faulthandler.dump_traceback_later(60, exit=True)`、Node: `setTimeout(() => process.exit(124), 60000).unref()`）または反復上限を組み込み、記載ミス時も行番号を出して自律終了させる。
 
 ## 10. 設定ファイルの配置と SSOT
 - Antigravity 設定は `~/.gemini/config/` と `GEMINI.md` に集約し他ツール設定と分離。

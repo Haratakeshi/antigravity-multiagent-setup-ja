@@ -244,7 +244,16 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="Run environment preflight check only (JSON output)")
     ap.add_argument("--dry-run", action="store_true", help="Preview installation without writing files")
     ap.add_argument("--target-home", type=Path, default=Path.home(), help="Target home directory (default: ~)")
-    ap.add_argument("--with-process-gate", action="store_true", help="Also install optional Node.js process-review-gate Stop hook")
+    ap.add_argument(
+        "--with-process-gate",
+        action="store_true",
+        help="Explicitly enable Smart process-review-gate Stop hook (enabled by default when Node.js is available)",
+    )
+    ap.add_argument(
+        "--without-process-gate",
+        action="store_true",
+        help="Skip installing the Smart process-review-gate Stop hook",
+    )
     ap.add_argument("--with-claude-skills", action="store_true", help="Also install grilling skill into ~/.claude/skills/")
     ap.add_argument("--skip-project-bootstrapper", action="store_true", help="Skip installing ~/.agent/antigravity-project-setup")
     args = ap.parse_args()
@@ -268,7 +277,8 @@ def main() -> int:
     managed_targets.extend(gemini_dir / "config" / "plugins" / p for p in PLUGINS)
     managed_targets.extend(gemini_dir / "config" / "skills" / s for s in SKILLS)
 
-    enable_process_gate = bool(args.with_process_gate and env_info["node"])
+    want_process_gate = not args.without_process_gate
+    enable_process_gate = bool(want_process_gate and env_info["node"])
     if enable_process_gate:
         managed_targets.append(gemini_dir / "scripts" / "process-review-gate.mjs")
         managed_targets.append(gemini_dir / "config" / "hooks.json")
@@ -311,14 +321,14 @@ def main() -> int:
             args.dry_run,
         )
 
-    # 5. Optional components
-    process_gate_status = "skipped (pass --with-process-gate to enable)"
-    if args.with_process_gate:
-        if not env_info["node"]:
-            process_gate_status = "skipped (node binary not found in PATH)"
-        else:
-            process_gate_status = install_process_gate(gemini_dir, args.dry_run)
-            installed_files += 2
+    # 5. Smart process-review-gate (enabled by default when Node.js is available) & optional Claude skills
+    if args.without_process_gate:
+        process_gate_status = "skipped (--without-process-gate specified)"
+    elif not env_info["node"]:
+        process_gate_status = "skipped (node binary not found in PATH)"
+    else:
+        process_gate_status = install_process_gate(gemini_dir, args.dry_run)
+        installed_files += 2
 
     claude_skill_status = "skipped (pass --with-claude-skills to enable)"
     if args.with_claude_skills:

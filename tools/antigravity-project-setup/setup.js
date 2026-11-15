@@ -896,12 +896,12 @@ function buildDirTree(dirs) {
 function getPackageManagerRule(pm) {
   if (pm === 'pnpm' || pm === 'npm' || pm === 'yarn') {
     return `- \`npm\` / \`npx\` / \`npm exec\` / \`npm install -g\` / \`pnpx\` は使用禁止です。pnpm へ置換してください。
-- JavaScript/TypeScript は \`/opt/homebrew/bin/pnpm\` を優先します。PATH が通っている場合のみ \`pnpm\` と書いて構いません。
+- JavaScript/TypeScript は PATH 解決の素の \`pnpm\` を優先します（\`agy_tool_safety\` の \`absolute_path\` 同期審査を回避するため。PATH 未解決環境のみ \`/opt/homebrew/bin/pnpm\` を参照）。別ディレクトリ実行は \`cd <dir> && pnpm ...\` ではなく \`pnpm --dir <dir> ...\` を使用してください。
 - \`npm install\` は \`pnpm install --frozen-lockfile\`、\`npm install <pkg>\` は \`pnpm add <pkg>\`、\`npm install -D <pkg>\` は \`pnpm add -D <pkg>\`、\`npm run <script>\` は \`pnpm run <script>\`、\`npx <cmd>\` はローカル依存なら \`pnpm exec <cmd>\`、一時実行なら \`pnpm dlx <pkg>@<固定バージョン>\` に置換してください。
 - \`@latest\` 指定は禁止です。実行前にバージョンを調査し、固定バージョンと lockfile を使ってください。
 - 新規/更新プロジェクトでは \`packageManager\` に pnpm の固定バージョンを設定し、\`pnpm-lock.yaml\` を必ずコミットしてください。lockfile のない依存追加は行わないでください。`;
   } else if (pm === 'uv') {
-    return `- Python は \`pip install\` / \`pip3 install\` / \`python -m pip install\` を直接実行禁止です。\`/opt/homebrew/bin/uv\` または \`~/.local/bin/uv\` を使い、\`uv add\`、\`uv sync --locked\`、\`uv run --locked\`、または \`uv pip compile\` + \`uv pip sync\` に置換してください。
+    return `- Python は \`pip install\` / \`pip3 install\` / \`python -m pip install\` を直接実行禁止です。PATH 解決の素の \`uv\` を優先し（PATH 未解決環境のみ \`/opt/homebrew/bin/uv\` または \`~/.local/bin/uv\` を参照）、\`uv add\`、\`uv sync --locked\`、\`uv run --locked\`、または \`uv pip compile\` + \`uv pip sync\` に置換してください（別ディレクトリ実行は \`uv --directory <dir> ...\`）。
 - Python CLI ツールの一時実行は \`uvx <tool>@<固定バージョン>\` を優先してください。\`pipx install\` が必要な場合は理由を明示し、グローバル汚染がないことを確認してください。
 - 既存プロジェクトが pip/requirements 運用を前提にしている場合は、勝手に実行せず、uv への移行案または一回限りの例外理由を提示してから進めてください。`;
   } else if (pm === 'flutter pub') {

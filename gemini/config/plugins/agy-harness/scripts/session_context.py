@@ -6,6 +6,39 @@ import json
 import os
 import re
 import sys
+import time
+
+GC_INTERVAL_SEC = 86400
+DEFAULT_TTL_DAYS = 14
+
+
+def prune_stale_state(target_dir: str) -> None:
+    marker = os.path.join(target_dir, ".last_gc")
+    now = time.time()
+    try:
+        if os.path.exists(marker) and (now - os.path.getmtime(marker)) < GC_INTERVAL_SEC:
+            return
+    except OSError:
+        pass
+    try:
+        ttl_days = max(1, int(os.environ.get("AGY_STATE_TTL_DAYS", str(DEFAULT_TTL_DAYS))))
+    except ValueError:
+        ttl_days = DEFAULT_TTL_DAYS
+    cutoff = now - (ttl_days * 86400)
+    try:
+        with os.scandir(target_dir) as it:
+            for entry in it:
+                if not entry.name.endswith((".count", ".stopgate", ".bingate", ".procgate", ".catchgate")):
+                    continue
+                try:
+                    if entry.stat(follow_symlinks=False).st_mtime < cutoff:
+                        os.unlink(entry.path)
+                except OSError:
+                    pass
+        with open(marker, "w", encoding="utf-8") as mf:
+            mf.write(str(int(now)))
+    except OSError:
+        pass
 
 
 def emit(obj):
@@ -28,6 +61,7 @@ state_dir = os.path.join(
     "agy-harness",
 )
 os.makedirs(state_dir, exist_ok=True)
+prune_stale_state(state_dir)
 state_file = os.path.join(state_dir, cid + ".count")
 
 n = 0

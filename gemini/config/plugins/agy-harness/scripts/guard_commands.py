@@ -23,6 +23,7 @@ REDIR_ONLY_RE = re.compile(r"^\d*([<>]{1,2}|>&|<&|&>>?|<>)$")
 REDIR_INLINE_RE = re.compile(r"^\d*([<>]{1,2}|>&|<&|&>>?|<>).+")
 WRAPPER_PROGS = frozenset({
     "sudo", "env", "command", "builtin", "nohup", "nice", "time", "stdbuf", "arch", "doas",
+    "timeout", "gtimeout",
     "sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "fish",
     "eval", "exec", "xargs", "find", "parallel", "watch",
     "python", "python3", "node", "perl", "ruby",
@@ -287,14 +288,213 @@ def is_safe_tmp_only_rm(command: str) -> bool:
     return rm_segments > 0
 
 
+VITEST_ONESHOT_ARGS = frozenset({
+    "run", "--run", "--watch=false", "--no-watch", "--version", "-v", "--help", "-h", "list", "init",
+})
+VITEST_OPTS_WITH_VALUE = frozenset({
+    "-t", "--testNamePattern", "-c", "--config", "-r", "--root", "--dir", "--project",
+    "--environment", "--reporter", "--outputFile", "--pool", "--shard", "--bail", "--retry", "--testTimeout", "--hookTimeout",
+})
+RUNNER_OPTS_WITH_VALUE = frozenset({
+    "-C", "--dir", "--filter", "-F", "--prefix", "-p", "--package", "--directory", "--project", "--python", "--with",
+})
+
+
+def _strip_pkg_version(name: str) -> str:
+    if not name or name.startswith("@"):
+        return name
+    return name.split("@", 1)[0]
+
+
+def _unwrap_runner_tokens(tokens: list[str]) -> tuple[str, list[str]]:
+    """Unwrap env/nohup/sudo/pnpm/uv/npx/python -m prefixes to extract (target_tool_basename, remaining_args)."""
+    idx = 0
+    n = len(tokens)
+    while idx < n:
+        raw_base = os.path.basename(tokens[idx].lstrip("=$")).lower()
+        base = _strip_pkg_version(raw_base)
+        if base in ("nohup", "command", "time", "exec"):
+            idx += 1
+            continue
+        if base == "env":
+            idx += 1
+            while idx < n:
+                t = tokens[idx]
+                if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t) or t in ("-i", "-0"):
+                    idx += 1
+                elif t in ("-u", "-C", "-S"):
+                    idx += 2
+                elif t.startswith("-"):
+                    idx += 1
+                else:
+                    break
+            continue
+        if base in ("sudo", "nice"):
+            idx += 1
+            while idx < n and tokens[idx].startswith("-"):
+                if tokens[idx] in ("-u", "-g", "-n", "-C"):
+                    idx += 2
+                else:
+                    idx += 1
+            continue
+        if base in ("pnpm", "uv", "npx", "pnpx", "bunx", "yarn"):
+            idx += 1
+            while idx < n:
+                tok = tokens[idx]
+                if tok in RUNNER_OPTS_WITH_VALUE:
+                    idx += 2
+                    continue
+                if tok.startswith("-"):
+                    idx += 1
+                    continue
+                if tok in ("exec", "dlx", "x"):
+                    idx += 1
+                    continue
+                if base == "uv" and tok == "run":
+                    idx += 1
+                    while idx < n and tokens[idx].startswith("-"):
+                        if tokens[idx] in RUNNER_OPTS_WITH_VALUE:
+                            idx += 2
+                        else:
+                            idx += 1
+                    break
+                break
+            continue
+        if re.fullmatch(r"python(?:3(?:\.\d+)?)?", base):
+            p_idx = idx + 1
+            while p_idx < n and tokens[p_idx].startswith("-") and tokens[p_idx] != "-m":
+                if tokens[p_idx] in ("-W", "-X"):
+                    p_idx += 2
+                else:
+                    p_idx += 1
+            if p_idx + 1 < n and tokens[p_idx] == "-m":
+                mod = _strip_pkg_version(os.path.basename(tokens[p_idx + 1]).lower())
+                return mod, tokens[p_idx + 2 :]
+        break
+    if idx >= n:
+        return "", []
+    return _strip_pkg_version(os.path.basename(tokens[idx].lstrip("=$")).lower()), tokens[idx + 1 :]
+
+
+def detect_noninteractive_hang(command: str, is_daemon: bool, _depth: int = 0) -> str | None:
+    """Detect interactive/watch-mode commands that hang forever when IsDaemon is false."""
+    if is_daemon or _depth > 2:
+        return None
+    segments = _split_shell_ops(command)
+    if not segments:
+        return None
+    for seg in segments:
+        try:
+            tokens = shlex.split(seg, posix=True)
+        except ValueError:
+            continue
+        while tokens:
+            t0 = tokens[0]
+            t0_low = t0.lower()
+            if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t0) or t0_low in SHELL_PREFIX_KEYWORDS:
+                tokens.pop(0)
+                continue
+            if REDIR_ONLY_RE.match(t0):
+                tokens.pop(0)
+                if tokens:
+                    tokens.pop(0)
+                continue
+            if REDIR_INLINE_RE.match(t0):
+                tokens.pop(0)
+                continue
+            break
+        if not tokens:
+            continue
+        lead = os.path.basename(tokens[0].lstrip("=$")).lower()
+        if lead in ("timeout", "gtimeout"):
+            continue
+        tool_base, tool_args = _unwrap_runner_tokens(tokens)
+        if tool_base in ("sh", "bash", "zsh", "dash", "ksh"):
+            for i_arg, a in enumerate(tool_args):
+                if a == "-c" and i_arg + 1 < len(tool_args):
+                    nested = detect_noninteractive_hang(tool_args[i_arg + 1], is_daemon, _depth + 1)
+                    if nested:
+                        return nested
+                    break
+                if re.fullmatch(r"-[A-Za-z]*c", a) and i_arg + 1 < len(tool_args):
+                    nested = detect_noninteractive_hang(tool_args[i_arg + 1], is_daemon, _depth + 1)
+                    if nested:
+                        return nested
+                    break
+            continue
+        if tool_base == "vitest":
+            has_explicit_watch = False
+            has_oneshot = False
+            vi = 0
+            while vi < len(tool_args):
+                a = tool_args[vi]
+                if a in VITEST_OPTS_WITH_VALUE:
+                    vi += 2
+                    continue
+                if a in ("watch", "--watch", "-w", "--watch=true"):
+                    has_explicit_watch = True
+                elif a in VITEST_ONESHOT_ARGS or (a.startswith("--run=") and not a.endswith("=false")):
+                    has_oneshot = True
+                vi += 1
+            if has_explicit_watch or not has_oneshot:
+                return (
+                    "非デーモン実行での vitest ウォッチモード起動は無限待機の原因になります。"
+                    "最適解: `pnpm --dir <dir> exec vitest run --testTimeout=30000` のように `run` を明示してください（常駐させる場合は IsDaemon: true を指定）。"
+                )
+        elif tool_base == "jest":
+            if any(
+                a in ("--watch", "--watchAll")
+                or (a.startswith(("--watch=", "--watchAll=")) and not a.endswith("=false"))
+                for a in tool_args
+            ):
+                return (
+                    "非デーモン実行での jest ウォッチモード起動は無限待機の原因になります。"
+                    "最適解: `--ci` または `--watchAll=false` を指定してください。"
+                )
+        elif tool_base == "playwright":
+            if any(
+                a in ("--ui", "--debug")
+                or a.startswith(("--ui=", "--ui-port", "--ui-host"))
+                for a in tool_args
+            ):
+                return (
+                    "非デーモン実行での playwright --ui / --debug は対話待機の原因になります。"
+                    "最適解: ヘッドレス単発実行 (`pnpm exec playwright test --timeout=30000`) を使用してください。"
+                )
+        elif tool_base in ("pytest", "py.test"):
+            if any(a in ("--pdb", "-f", "--looponfail") for a in tool_args):
+                return "非デーモン実行での pytest --pdb / --looponfail は無限待機の原因になります。単発実行フラグのみで実行してください。"
+        elif tool_base == "tail":
+            for a in tool_args:
+                if a == "--":
+                    break
+                if (
+                    a in ("-f", "-F", "--follow")
+                    or a.startswith("--follow=")
+                    or re.fullmatch(r"-[0-9A-Za-z]*[fF][0-9A-Za-z]*", a)
+                ):
+                    return (
+                        "非デーモン実行での `tail -f` は終了せずタスクを永久停止させます。"
+                        "最適解: `read_file` ツール（StartLine/EndLine 指定）でログを直接読み取ってください。"
+                    )
+    return None
+
+
 try:
     payload = json.load(sys.stdin)
-    cmd = str(payload.get("toolCall", {}).get("args", {}).get("CommandLine", ""))
+    args_obj = payload.get("toolCall", {}).get("args") or {}
+    cmd = str(args_obj.get("CommandLine", ""))
+    raw_daemon = args_obj.get("IsDaemon")
+    is_daemon = raw_daemon is True or str(raw_daemon).strip().lower() == "true"
 except Exception:
     emit({"decision": "allow"})
 
 if not cmd.strip():
     emit({"decision": "allow"})
+
+hang_reason = detect_noninteractive_hang(cmd, is_daemon)
+if hang_reason:
+    emit({"decision": "deny", "reason": hang_reason})
 
 # --- deny: 禁止事項。reason には代替となる最適解を必ず示す ---
 # 先頭境界に引用符・バッククォートを含める (sh -c 'npm install ...' 等のシェル間接実行も検出する)
