@@ -2,6 +2,7 @@
   "cli_path": "claude",
   "model": "claude-fable-5-2",
   "expected_model_substring": "fable-5-2",
+  "use_bare": true,
   "tools": ["Read", "Grep", "Glob"],
   "timeout_sec": 900,
   "max_context_bytes": 400000

@@ -1,49 +1,55 @@
 ---
 name: ask-fable
-description: 解決困難なバグ、状態遷移や非同期の設計判断、技術選定のトレードオフ、3ストライク時の壁に直面した際に、シニアアーキテクト（軍師）をワンショット召喚して独立したセカンドオピニオン・助言を得るスキル（旧 ask-opus）。Claude Code CLI がある環境では最高性能の Claude Fable 5.2 (claude-fable-5-2) を呼び出し、無い環境では Antigravity 内蔵の上位モデル（Gemini 4 Carbon / 内蔵 Claude Opus・Sonnet / Pro）による senior-architect-advisor サブエージェントへ自動フォールバックする。
+description: 【Human明示指示＋商用APIキー限定】人間がチャットで明示的に「ask-fable（外部 Claude Fable 5.2 API）」の使用を指示した最重要タスクに限り、`ANTHROPIC_API_KEY`（商用従量課金・`--bare` モード）経由で `claude-fable-5-2` に読取専用相談を行うスキル。通常運用・3ストライク時は自動実行せず必ず標準の `ask-opus`（Antigravity内蔵 Opus 5.5 High）を使用すること。
 ---
 
-# ask-fable: 軍師（シニアアーキテクト）アドバイザー召喚スキル（Claude Fable 5.2 / 内蔵代替対応）
+# ask-fable: 外部 Claude Fable 5.2 API 召喚スキル（Human明示指示 ＆ 商用APIキー厳格限定）
 
-日常の開発・並列実装は高速に進めつつ、**「設計の難所」「複雑なトレードオフ」「3連続失敗で壁にぶつかった時」にのみ、最高性能のシニアアーキテクトをワンショットで召喚**して深い見立てと推奨設計を得るスキルです（旧 `ask-opus` を刷新）。
+> [!IMPORTANT]
+> **利用規約（ToS）および課金保護のための絶対ルール**
+> 1. **エージェントの自律判断による自動起動は厳禁**: 3ストライク時や通常の設計相談では本スキルを呼ばず、必ず標準の **`ask-opus`（Antigravity 内蔵 `Claude Opus 5.5 (High)`）** を使用してください。本スキルは **人間（Human）がプロンプトで明示的に `ask-fable` / 外部 Fable 5.2 の使用を指示したときのみ** 実行できます。
+> 2. **個人サブスクリプション OAuth（`claude.ai` Free/Pro/Max/Ultra）の完全遮断**: Anthropic Consumer Terms of Service（外部エージェントからの自動化アクセス禁止）を遵守するため、`ask_fable.py` は **商用の `ANTHROPIC_API_KEY`**（環境変数または `~/.gemini/.env` 内の設定）または商用クラウド認証（Bedrock / Vertex AI / Foundry）が存在しない限り **機械的にブロック（`exit 2`）** します。また実行時は公式 `--bare` モードを強制し、Keychain や `claude.ai` OAuth トークンを一切読み取りません。
+> 3. **データ学習設定の確認**: 外部 Claude API の出力を Antigravity に取り込む際は、競合モデル学習禁止条項への配慮として Antigravity 側のデータ学習利用オプトアウト設定を推奨します。
 
-## 2段階の実行ルート（Claude CLI: Fable 5.2 優先 ＋ Antigravity 内蔵サブエージェント自動代替）
+---
 
-### ルート A: 外部 `claude` CLI（Claude Code）が存在する環境
-まず以下のスクリプトを実行します（既定モデル: `claude-fable-5-2`。`PATH` や `~/.local/bin/claude` 等から自動で `claude` バイナリを検出します）：
+## 1. 事前設定（初回のみ・Human 作業）
+
+重要な局面で `ask-fable` を使いたい場合は、Anthropic Console で発行した商用 API キーを `~/.gemini/.env`（パーミッション `600`）に保存しておきます（チャット画面やコマンド引数にキー平文を書く必要はありません）：
+
+```bash
+# ~/.gemini/.env の記載例（通常時はエージェントが勝手に呼ぶことはありません）
+ANTHROPIC_API_KEY=<YOUR_ANTHROPIC_API_KEY>
+```
+
+確認コマンド（キー値は出力されません）：
+```bash
+python3 ~/.gemini/config/plugins/claude-orchestrator-kit/skills/ask-fable/scripts/ask_fable.py --check
+```
+
+---
+
+## 2. 実行手順（Human から明示指示を受けた場合のみ）
+
+Human から明示的に `ask-fable` の実行指示を受けた場合のみ、`--human-authorized` フラグを付与して実行します：
 
 ```bash
 python3 ~/.gemini/config/plugins/claude-orchestrator-kit/skills/ask-fable/scripts/ask_fable.py \
-  --topic "相談したい課題・設計の悩み・エラーの状況" \
+  --human-authorized \
+  --topic "相談したい課題・設計の悩み・トレードオフ" \
   --repo <作業リポジトリのパス> \
   --out <artifactDir>/fable_advice.md \
   [--target <参照させたいファイルパス> ...] \
-  [--context-file <試行錯誤ログや背景説明.md>] \
-  [--model claude-fable-5-2]
+  [--context-file <試行錯誤ログや背景説明.md>]
 ```
 
-- 終了コード `0`: 成功（Claude Fable 5.2 による助言取得・モデル検証完了、`--out` にレポート出力済み）。レポートを読んで設計判断に活かします。
-- 終了コード `2`（`[FALLBACK_TO_NATIVE_SUBAGENT]` が出力された場合 = `claude` CLI 未導入・未認証・レート制限）: **即座にルート B へ進みます**。
-- 終了コード `3`: 解決モデル不一致（`resolved_models` を確認）。
+- **終了コード**:
+  - `0`: 助言取得成功（`resolved_models` に `fable-5-2` を確認済み）
+  - `2`: 未設定・ブロック（`ANTHROPIC_API_KEY` 未設定による Consumer OAuth 遮断、`claude` CLI 不在、または `--human-authorized` 欠落）
+  - `3`: 解決モデル不一致
 
 ---
 
-### ルート B: `claude` CLI が存在しない環境（Antigravity 内蔵モデル代替）
-外部 `claude` CLI が未導入のマシンでは、`invoke_subagent` で内蔵カスタムサブエージェント **`senior-architect-advisor`** を起動します：
+## 3. 終了コード `2` 時のフォールバック（`ask-opus` への切替）
 
-- **モデル指定ルール**:
-  - 現在のメインモデルが **Gemini 4 Carbon / Argon**、または **Antigravity 内蔵の Claude Opus / Sonnet** の場合: `Model: "inherit"` を指定（内蔵の上位モデル自身が独立コンテキストの軍師として動作します）。
-  - 現在のメインモデルが **Gemini Flash** の場合: `Model: "pro"` を指定（内蔵の上位推論モデルで動作します）。
-
-```json
-{
-  "TypeName": "senior-architect-advisor",
-  "Role": "Senior Architect Second-Opinion Advisor",
-  "Model": "inherit",
-  "Prompt": "相談テーマ:\n<topic>\n[相談したい論点・設計トレードオフ・3ストライクの状況]\n</topic>\n\n参照対象:\n- リポジトリ: [作業リポジトリパス]\n- 重点ファイル: [対象ファイルパス一覧]\n\n実際のコードを並列バッチで直接確認した上で、迎合のないシニアアーキテクトとしての推奨設計・盲点・代替案比較をあなた自身の artifact ディレクトリ (architect_advice.md, ArtifactMetadata 付き) に write_to_file で書き出し、結論3行要約と保存先絶対パスを send_message で返してください。"
-}
-```
-
-## 特徴と安全境界
-1. **安全な読み取り専用境界**: ルート A（`Read,Grep,Glob` 限定）・ルート B ともにプロダクションコードの書き換えやシェル実行は行いません。
-2. **コンテキスト保護**: 詳細な助言はアーティファクトファイルに出力させ、メインスレッドは返却されたパスを必要な箇所だけ参照します（Antigravity v2.30+ ではサブエージェントは自身の `brain/<subagent-id>/` に出力し絶対パスを親へ共有します）。
+`ANTHROPIC_API_KEY` が未設定等で終了コード `2`（`[FALLBACK_TO_NATIVE_SUBAGENT]`）が返った場合は、Consumer OAuth で無理に実行しようとせず、ユーザーに「商用 `ANTHROPIC_API_KEY` 未設定のため外部 API 呼び出しはスキップし、Antigravity 内蔵 `Claude Opus 5.5 (High)`（`ask-opus`）で代替する」旨を伝えて **`ask-opus` スキル** を実行してください。

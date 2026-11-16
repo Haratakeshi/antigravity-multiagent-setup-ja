@@ -87,6 +87,30 @@ def inspect_environment(target_home: Path) -> dict:
     python3_bin = shutil.which("python3")
     python_bin = shutil.which("python")
 
+    has_commercial_claude_api = False
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        has_commercial_claude_api = True
+    elif any(
+        os.environ.get(k, "").strip().lower() in ("1", "true", "yes")
+        for k in ("CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
+    ):
+        has_commercial_claude_api = True
+    else:
+        dotenv_p = gemini_dir / ".env"
+        if dotenv_p.is_file():
+            try:
+                for raw_l in dotenv_p.read_text(encoding="utf-8", errors="replace").splitlines():
+                    s_l = raw_l.strip()
+                    if s_l.startswith("export "):
+                        s_l = s_l[7:].strip()
+                    if s_l.startswith("ANTHROPIC_API_KEY="):
+                        val_l = s_l.split("=", 1)[1].strip().strip("'\"")
+                        if len(val_l) >= 12:
+                            has_commercial_claude_api = True
+                            break
+            except OSError:
+                pass
+
     return {
         "os": platform.system(),
         "platform": platform.platform(),
@@ -97,10 +121,11 @@ def inspect_environment(target_home: Path) -> dict:
         "pnpm": pnpm_bin,
         "uv": uv_bin,
         "claude_cli": claude_bin,
+        "claude_commercial_api_configured": has_commercial_claude_api,
         "claude_fallback_mode": (
-            "external_claude_cli"
-            if claude_bin
-            else "native_antigravity_subagents (senior-architect-advisor / carbon-verifier / mindfulness-inspector)"
+            "default: native_antigravity_opus_5_5_high (ask-opus) | explicit_human_ask_fable: enabled (commercial_api --bare)"
+            if (claude_bin and has_commercial_claude_api)
+            else "default: native_antigravity_opus_5_5_high (ask-opus) | explicit_human_ask_fable: blocked_until_anthropic_api_key_set (ToS protection)"
         ),
         "target_home": str(target_home),
         "existing_gemini_md": (gemini_dir / "GEMINI.md").is_file(),

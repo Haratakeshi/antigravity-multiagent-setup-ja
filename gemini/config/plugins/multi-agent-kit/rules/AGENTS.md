@@ -4,7 +4,7 @@
 
 ## 3. Audit Independence
 
-- **3.1 外部レビューと自動フォールバック**: 外部CLIレビュー（Claude CLI 等）は導入済み環境または明示指定時に実行。未導入・認証不可時は `status: external_review_unavailable`（`external_cli_review_verdict: unverified`）を記録し、内蔵サブエージェント（`carbon-verifier` / `mindfulness-inspector` / `second-opinion-lite`）へ自動フォールバックして独立検証を完遂する。
+- **3.1 内蔵独立監査の標準化と外部 API 利用規約ガード**: 通常運用では Antigravity 内蔵サブエージェント（`carbon-verifier` / `mindfulness-inspector` / `second-opinion-lite` / `ask-opus` 内蔵 `claude-opus-5-5-high`）で独立検証を完遂する。外部 Claude CLI スクリプト（`exit_review.py` / `sonnet_inspect.py` / `ask_fable.py`）は **Human が明示指示（`--human-authorized`）し、かつ商用 `ANTHROPIC_API_KEY`（または Bedrock/Vertex/Foundry）が設定されている場合のみ `--bare` モードで実行**し、個人サブスクリプション OAuth（`claude.ai`）環境や未導入時は `status: external_review_unavailable` で遮断して内蔵サブエージェントへ自動フォールバックする。
 - **3.2 検査対象の忠実評価**: 指定対象ファイルの実内容を基準に判定し、fixture・類似ファイルは補助資料として区別する。
 - **3.3 ラウンド上限と併用**: 自動 second-opinion は通常最大2ラウンド、重要変更（認証・決済・データ破壊・状態遷移・非同期排他）は最大3ラウンド（3-Strike PDCA）。上限到達後も未収束なら `pending_human_review` で人間へ引き渡す。併用時の重複排除・採否判断は親が担う。
 - **3.4 クリーンルーム規律**:

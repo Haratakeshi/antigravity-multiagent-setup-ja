@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Clean-room exit review of a git working tree by Claude Fable 5.2 (external CLI, read-only tools).
+"""Clean-room exit review of a git working tree by Claude Fable 5.2 strictly under Commercial API auth.
 
-If external `claude` CLI is not installed on this machine, exits with code 2 and emits a
-`[FALLBACK_TO_NATIVE_SUBAGENT]` directive instructing Antigravity to run `carbon-verifier`
-natively (inheriting built-in Claude Sonnet/Opus, Gemini 4 Carbon, or Pro).
+Compliance & Billing Guardrails:
+1. Standard exit reviews use Antigravity built-in `carbon-verifier` / `second-opinion-lite` by default.
+2. External execution requires BOTH `--human-authorized` AND commercial credentials (`ANTHROPIC_API_KEY`
+   in env or `~/.gemini/.env`, or Bedrock/Vertex/Foundry). Consumer `claude.ai` OAuth is strictly blocked.
+3. Runs `claude --bare -p` with `CLAUDE_CODE_OAUTH_TOKEN` stripped so Keychain/OAuth tokens are never read.
 """
 import argparse
 import faulthandler
@@ -18,6 +20,9 @@ from datetime import datetime
 from pathlib import Path
 
 CONFIG = json.loads((Path(__file__).resolve().parent.parent / "config.json").read_text(encoding="utf-8"))
+
+PLACEHOLDER_KEYS = {"", "none", "null", "false", "your_api_key", "your-api-key", "<your_anthropic_api_key>"}
+CLOUD_PROVIDER_VARS = ("CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
 
 PROMPT = """あなたは独立したクリーンルーム・レビュアーです。作成者の意図や経緯は知らされていません。
 以下の「受け入れ基準 / 不変条件」と「差分」だけを根拠に、最終成果物を反証的にレビューしてください。
@@ -40,6 +45,66 @@ PROMPT = """あなたは独立したクリーンルーム・レビュアーで�
 """
 
 
+def _parse_dotenv_file(dotenv_path: Path) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    if not dotenv_path.is_file():
+        return parsed
+    try:
+        for raw in dotenv_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].strip()
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"') or (v[0] == "'" and v[-1] == "'")):
+                v = v[1:-1].strip()
+            elif " #" in v:
+                v = v.split(" #", 1)[0].strip()
+            if k:
+                parsed[k] = v
+    except OSError:
+        pass
+    return parsed
+
+
+def resolve_commercial_auth_env() -> tuple[dict[str, str] | None, str]:
+    home_dir = Path(os.environ.get("HOME") or str(Path.home()))
+    dotenv_override = os.environ.get("AGY_DOTENV_PATH", "").strip()
+    dotenv_path = Path(dotenv_override).expanduser() if dotenv_override else (home_dir / ".gemini" / ".env")
+    dotenv_vals = _parse_dotenv_file(dotenv_path)
+
+    child_env = dict(os.environ)
+    child_env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
+
+    api_key = child_env.get("ANTHROPIC_API_KEY", "").strip()
+    key_source = "env:ANTHROPIC_API_KEY"
+    if not api_key and "ANTHROPIC_API_KEY" in dotenv_vals:
+        api_key = dotenv_vals["ANTHROPIC_API_KEY"].strip()
+        if api_key:
+            child_env["ANTHROPIC_API_KEY"] = api_key
+            key_source = f"dotenv:{dotenv_path.name}"
+
+    if api_key and api_key.lower() not in PLACEHOLDER_KEYS and len(api_key) >= 12:
+        return child_env, key_source
+
+    for pvar in CLOUD_PROVIDER_VARS:
+        pval = child_env.get(pvar, "").strip() or dotenv_vals.get(pvar, "").strip()
+        if pval.lower() in ("1", "true", "yes"):
+            child_env[pvar] = pval
+            return child_env, f"cloud:{pvar}"
+
+    return (
+        None,
+        "[BLOCKED_CONSUMER_OAUTH] Commercial API credentials (ANTHROPIC_API_KEY or Bedrock/Vertex/Foundry) are not set; "
+        "Consumer Pro/Max subscription OAuth is blocked to comply with Anthropic Terms of Service",
+    )
+
+
 def resolve_claude_cli(configured: str) -> str | None:
     env_cli = os.environ.get("CLAUDE_CLI_PATH", "").strip()
     if env_cli:
@@ -51,7 +116,7 @@ def resolve_claude_cli(configured: str) -> str | None:
     which_hit = shutil.which("claude")
     if which_hit:
         candidates.append(which_hit)
-    home = Path.home()
+    home = Path(os.environ.get("HOME") or str(Path.home()))
     candidates.extend([
         str(home / ".local" / "bin" / "claude"),
         "/opt/homebrew/bin/claude",
@@ -98,7 +163,7 @@ def parse_verdict(text: str) -> str:
 def unavailable(reason: str) -> int:
     print(f"status: external_review_unavailable ({reason})", file=sys.stderr)
     print(
-        "[FALLBACK_TO_NATIVE_SUBAGENT] External `claude` CLI is unavailable on this machine. "
+        "[FALLBACK_TO_NATIVE_SUBAGENT] External `claude` API review is unavailable or not authorized. "
         "Invoke subagent `carbon-verifier` via `invoke_subagent` with the same clean-room criteria, repo diff, and screenshot paths "
         "(use Model='inherit' when main model is Carbon/Argon/Claude, or Model='pro' when main model is Flash).",
         file=sys.stderr,
@@ -113,12 +178,18 @@ def _watchdog_abort() -> None:
 
 
 def main() -> int:
-    wd = threading.Timer(int(CONFIG.get("timeout_sec", 900)) + 60, _watchdog_abort)
+    timeout_sec = int(CONFIG.get("timeout_sec", 900))
+    wd = threading.Timer(timeout_sec + 60, _watchdog_abort)
     wd.daemon = True
     wd.start()
     try:
         ap = argparse.ArgumentParser()
-        ap.add_argument("--check", action="store_true", help="Claude CLI の存在確認のみを実行")
+        ap.add_argument("--check", action="store_true", help="Claude CLI と商用 API 認証の設定状態のみを確認")
+        ap.add_argument(
+            "--human-authorized",
+            action="store_true",
+            help="Human が明示的に外部 Fable API 監査を指示したことを示す必須フラグ",
+        )
         ap.add_argument("--repo", type=Path)
         ap.add_argument("--criteria", type=Path, help="受け入れ基準/不変条件を書いたファイル")
         ap.add_argument("--base", default="HEAD", help="比較基点 (default: HEAD = 未コミット差分)")
@@ -129,17 +200,24 @@ def main() -> int:
         a = ap.parse_args()
 
         cli_bin = resolve_claude_cli(CONFIG.get("cli_path", "claude"))
-        if a.check:
-            if cli_bin:
-                print(f"claude_cli: available ({cli_bin})")
-                return 0
+        if not cli_bin:
             return unavailable("claude CLI binary not found")
+
+        child_env, auth_info = resolve_commercial_auth_env()
+        if child_env is None:
+            return unavailable(auth_info)
+
+        if a.check:
+            print(f"claude_cli: available ({cli_bin}, auth={auth_info})")
+            return 0
+
+        if not a.human_authorized:
+            return unavailable(
+                "missing --human-authorized flag; use built-in carbon-verifier by default unless Human explicitly requests external API review"
+            )
 
         if not a.repo or not a.criteria or not a.out:
             ap.error("--repo, --criteria, and --out are required unless --check is passed")
-
-        if not cli_bin:
-            return unavailable("claude CLI binary not found")
 
         repo = a.repo.resolve()
         images = [p.resolve() for p in a.image]
@@ -166,8 +244,11 @@ def main() -> int:
         )
 
         tools = ",".join(CONFIG["allowed_tools"])
-        cmd = [
-            cli_bin, "-p", "--model", a.model, "--output-format", "json",
+        cmd = [cli_bin]
+        if CONFIG.get("use_bare", True):
+            cmd.append("--bare")
+        cmd += [
+            "-p", "--model", a.model, "--output-format", "json",
             "--tools", tools, "--allowedTools", tools,
         ]
         for d in sorted({str(p.parent) for p in images}):
@@ -181,7 +262,8 @@ def main() -> int:
                 encoding="utf-8",
                 errors="replace",
                 cwd=repo,
-                timeout=CONFIG["timeout_sec"],
+                env=child_env,
+                timeout=timeout_sec,
             )
             data = json.loads(r.stdout)
         except subprocess.TimeoutExpired:
@@ -201,7 +283,7 @@ def main() -> int:
         expected = (
             a.expected_model
             if a.expected_model is not None
-            else (a.model.split("[", 1)[0] if a.model != CONFIG["model"] else CONFIG["expected_model_substring"])
+            else (a.model.split("[", 1)[0] if a.model != CONFIG["model"] else CONFIG.get("expected_model_substring", a.model))
         ).lower()
         model_ok = bool(models) and any(expected in m.lower() for m in models)
         verdict = parse_verdict(result)
@@ -214,13 +296,14 @@ def main() -> int:
 
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(
-            f"# Claude Exit Review ({a.model})\n\n- date: {datetime.now().isoformat(timespec='seconds')}\n- repo: {repo}\n"
+            f"# Claude Exit Review ({a.model})\n\n- date: {datetime.now().isoformat(timespec='seconds')}\n"
+            f"- auth_mode: {auth_info} (--bare)\n- repo: {repo}\n"
             f"- base: {a.base}\n- requested_model: {a.model}\n- diff_truncated: {truncated}\n- images: {[str(p) for p in images]}\n"
             f"- resolved_models: {models}\n- model_check: {'OK' if model_ok else 'MISMATCH'}\n"
             f"- verdict: {verdict}\n- exit_code: {code}\n- cost_usd: {data.get('total_cost_usd')}\n\n---\n\n{result}\n",
             encoding="utf-8",
         )
-        print(f"external_cli_review_verdict: {verdict} | exit={code} | models={models} | report={a.out}")
+        print(f"external_cli_review_verdict: {verdict} | exit={code} | auth={auth_info} | models={models} | report={a.out}")
         return code
     finally:
         wd.cancel()

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Ask Claude Fable 5.2 for architectural advice, breakthrough ideas, and second opinions via external CLI.
+"""Ask Claude Fable 5.2 via external CLI strictly under explicit Human authorization + Commercial API auth.
 
-Tools are restricted to read-only (Read, Grep, Glob) so the advisor cannot modify project files directly.
-If external `claude` CLI is not installed or unavailable on this machine, exits with code 2 and
-emits a structured `[FALLBACK_TO_NATIVE_SUBAGENT]` instruction so Antigravity seamlessly invokes
-the built-in `senior-architect-advisor` subagent (running built-in Carbon/Argon/Claude Opus/Sonnet/Pro).
+Compliance & Billing Guardrails:
+1. Requires `--human-authorized` on execution so the agent never auto-triggers paid external API calls.
+2. Requires commercial credentials (`ANTHROPIC_API_KEY` in env or `~/.gemini/.env`, or Bedrock/Vertex/Foundry).
+   Consumer `claude.ai` subscription OAuth (Free/Pro/Max/Ultra) is strictly blocked to comply with Anthropic ToS.
+3. Runs `claude --bare -p` with `CLAUDE_CODE_OAUTH_TOKEN` stripped so Keychain/OAuth tokens are never read.
+4. Tools are restricted to read-only (Read, Grep, Glob).
 
 Exit codes:
   0 = advice obtained and target model verified
-  2 = unavailable (CLI/input/timeout error -> fallback to senior-architect-advisor)
+  2 = unavailable / blocked (missing API key, missing --human-authorized, CLI absent, or timeout -> fallback to ask-opus)
   3 = model mismatch (did not run on expected model)
 """
 import argparse
@@ -24,6 +26,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CONFIG = json.loads((HERE.parent / "config.json").read_text(encoding="utf-8"))
+
+PLACEHOLDER_KEYS = {"", "none", "null", "false", "your_api_key", "your-api-key", "<your_anthropic_api_key>"}
+CLOUD_PROVIDER_VARS = ("CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
 
 SYSTEM_PROMPT = """あなたは最高峰のシニアソフトウェアアーキテクト・軍師です。
 開発現場で発生した設計上の難所、3ストライク時の壁、または技術選定・アーキテクチャのトレードオフについて、独立したセカンドオピニオン・助言を求められています。
@@ -58,6 +63,66 @@ PROMPT_TEMPLATE = """相談テーマ / 解決したい課題:
 """
 
 
+def _parse_dotenv_file(dotenv_path: Path) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    if not dotenv_path.is_file():
+        return parsed
+    try:
+        for raw in dotenv_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].strip()
+            if "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"') or (v[0] == "'" and v[-1] == "'")):
+                v = v[1:-1].strip()
+            elif " #" in v:
+                v = v.split(" #", 1)[0].strip()
+            if k:
+                parsed[k] = v
+    except OSError:
+        pass
+    return parsed
+
+
+def resolve_commercial_auth_env() -> tuple[dict[str, str] | None, str]:
+    home_dir = Path(os.environ.get("HOME") or str(Path.home()))
+    dotenv_override = os.environ.get("AGY_DOTENV_PATH", "").strip()
+    dotenv_path = Path(dotenv_override).expanduser() if dotenv_override else (home_dir / ".gemini" / ".env")
+    dotenv_vals = _parse_dotenv_file(dotenv_path)
+
+    child_env = dict(os.environ)
+    child_env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
+
+    api_key = child_env.get("ANTHROPIC_API_KEY", "").strip()
+    key_source = "env:ANTHROPIC_API_KEY"
+    if not api_key and "ANTHROPIC_API_KEY" in dotenv_vals:
+        api_key = dotenv_vals["ANTHROPIC_API_KEY"].strip()
+        if api_key:
+            child_env["ANTHROPIC_API_KEY"] = api_key
+            key_source = f"dotenv:{dotenv_path.name}"
+
+    if api_key and api_key.lower() not in PLACEHOLDER_KEYS and len(api_key) >= 12:
+        return child_env, key_source
+
+    for pvar in CLOUD_PROVIDER_VARS:
+        pval = child_env.get(pvar, "").strip() or dotenv_vals.get(pvar, "").strip()
+        if pval.lower() in ("1", "true", "yes"):
+            child_env[pvar] = pval
+            return child_env, f"cloud:{pvar}"
+
+    return (
+        None,
+        "[BLOCKED_CONSUMER_OAUTH] Commercial API credentials (ANTHROPIC_API_KEY or Bedrock/Vertex/Foundry) are not set; "
+        "Consumer Pro/Max subscription OAuth is blocked to comply with Anthropic Terms of Service",
+    )
+
+
 def resolve_claude_cli(configured: str) -> str | None:
     env_cli = os.environ.get("CLAUDE_CLI_PATH", "").strip()
     if env_cli:
@@ -69,7 +134,7 @@ def resolve_claude_cli(configured: str) -> str | None:
     which_hit = shutil.which("claude")
     if which_hit:
         candidates.append(which_hit)
-    home = Path.home()
+    home = Path(os.environ.get("HOME") or str(Path.home()))
     candidates.extend([
         str(home / ".local" / "bin" / "claude"),
         "/opt/homebrew/bin/claude",
@@ -85,9 +150,9 @@ def resolve_claude_cli(configured: str) -> str | None:
 def unavailable(reason: str) -> int:
     print(f"status: external_review_unavailable ({reason})", file=sys.stderr)
     print(
-        "[FALLBACK_TO_NATIVE_SUBAGENT] External `claude` CLI is unavailable on this machine. "
-        "Invoke subagent `senior-architect-advisor` via `invoke_subagent` "
-        "(use Model='inherit' when main model is Carbon/Argon/Claude Opus/Sonnet, or Model='pro' when main model is Flash).",
+        "[FALLBACK_TO_NATIVE_SUBAGENT] External `claude` API mode is unavailable or not authorized. "
+        "Use the `ask-opus` skill instead: pin Antigravity built-in `claude-opus-5-5-high` via `swarm(action='add', model='claude-opus-5-5-high', ...)` "
+        "(or invoke `senior-architect-advisor` when already running on built-in Opus).",
         file=sys.stderr,
     )
     return 2
@@ -100,12 +165,18 @@ def _watchdog_abort() -> None:
 
 
 def main() -> int:
-    wd = threading.Timer(int(CONFIG.get("timeout_sec", 900)) + 60, _watchdog_abort)
+    timeout_sec = int(CONFIG.get("timeout_sec", 900))
+    wd = threading.Timer(timeout_sec + 60, _watchdog_abort)
     wd.daemon = True
     wd.start()
     try:
         ap = argparse.ArgumentParser()
-        ap.add_argument("--check", action="store_true", help="Claude CLI の存在確認のみを実行")
+        ap.add_argument("--check", action="store_true", help="Claude CLI と商用 API 認証の設定状態のみを確認")
+        ap.add_argument(
+            "--human-authorized",
+            action="store_true",
+            help="Human が明示的に外部 Fable API 呼び出しを指示したことを示す必須フラグ",
+        )
         ap.add_argument("--topic", help="相談したい論点・質問・壁の内容")
         ap.add_argument("--context-file", type=Path, help="背景説明や試行錯誤ログのファイル (任意)")
         ap.add_argument("--target", action="append", default=[], type=Path, help="参照すべきファイル/ディレクトリ")
@@ -116,17 +187,24 @@ def main() -> int:
         a = ap.parse_args()
 
         cli_bin = resolve_claude_cli(CONFIG.get("cli_path", "claude"))
-        if a.check:
-            if cli_bin:
-                print(f"claude_cli: available ({cli_bin})")
-                return 0
+        if not cli_bin:
             return unavailable("claude CLI binary not found")
+
+        child_env, auth_info = resolve_commercial_auth_env()
+        if child_env is None:
+            return unavailable(auth_info)
+
+        if a.check:
+            print(f"claude_cli: available ({cli_bin}, auth={auth_info})")
+            return 0
+
+        if not a.human_authorized:
+            return unavailable(
+                "missing --human-authorized flag; external ask-fable may only run on explicit Human instruction (use ask-opus by default)"
+            )
 
         if not a.topic or not a.repo or not a.out:
             ap.error("--topic, --repo, and --out are required unless --check is passed")
-
-        if not cli_bin:
-            return unavailable("claude CLI binary not found")
 
         if not a.repo.is_dir():
             return unavailable(f"repo directory not found: {a.repo}")
@@ -154,8 +232,10 @@ def main() -> int:
         )
 
         tools = ",".join(CONFIG["tools"])
-        cmd = [
-            cli_bin,
+        cmd = [cli_bin]
+        if CONFIG.get("use_bare", True):
+            cmd.append("--bare")
+        cmd += [
             "-p",
             "--model", a.model,
             "--output-format", "json",
@@ -175,7 +255,8 @@ def main() -> int:
                 encoding="utf-8",
                 errors="replace",
                 cwd=a.repo.resolve(),
-                timeout=CONFIG["timeout_sec"],
+                env=child_env,
+                timeout=timeout_sec,
             )
             data = json.loads(r.stdout)
         except subprocess.TimeoutExpired:
@@ -197,7 +278,7 @@ def main() -> int:
         expected = (
             a.expected_model
             if a.expected_model is not None
-            else (a.model.split("[", 1)[0] if a.model != CONFIG["model"] else CONFIG["expected_model_substring"])
+            else (a.model.split("[", 1)[0] if a.model != CONFIG["model"] else CONFIG.get("expected_model_substring", a.model))
         ).lower()
         model_ok = bool(models) and any(expected in m.lower() for m in models)
         code = 0 if model_ok else 3
@@ -206,6 +287,7 @@ def main() -> int:
         a.out.write_text(
             f"# Claude Architectural Advice ({a.model})\n\n"
             f"- date: {datetime.now().isoformat(timespec='seconds')}\n"
+            f"- auth_mode: {auth_info} (--bare)\n"
             f"- topic: {a.topic}\n"
             f"- repo: {a.repo.resolve()}\n"
             f"- requested_model: {a.model}\n"
@@ -218,7 +300,7 @@ def main() -> int:
 
         print(
             f"ask_fable: status={'OK' if model_ok else 'MODEL_MISMATCH'} | exit={code} "
-            f"| models={models} | cost=${data.get('total_cost_usd')} | report={a.out}"
+            f"| auth={auth_info} | models={models} | cost=${data.get('total_cost_usd')} | report={a.out}"
         )
         return code
     finally:

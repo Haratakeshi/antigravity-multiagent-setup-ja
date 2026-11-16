@@ -69,14 +69,15 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
 ### ステップ 3: ステージ2 事実再検査＆複合監査
 ステージ1の中間指摘集約と対象コードに対し、以下を並行実行します:
 
-1. **マインドフルネス事実再検査（第1手段: Claude Fable 5.2 CLI / フォールバック: 内蔵サブエージェント）**:
-   ```bash
-   python3 ~/.gemini/config/plugins/multi-agent-kit/skills/multi-agent-opinion/scripts/sonnet_inspect.py \
-     --findings <ステージ1指摘.md> --target <対象パス> [--target ...] \
-     --repo <作業ディレクトリ> --out <artifactDir>/sonnet_inspection.md
-   ```
-   - 終了コード `0` なら `--out` から `[CONFIRMED / UNVERIFIED / REJECTED]` を採用。
-   - 終了コード `2`（`external_review_unavailable` / CLI不在・認証切れ・レート制限）の場合は、直ちに内蔵サブエージェント **`mindfulness-inspector`（`Model: "inherit"`、メインが Flash 時は `"pro"`）** を `invoke_subagent` で起動して同じ3分類再検査を完遂します。
+1. **マインドフルネス事実再検査（既定: 内蔵 `mindfulness-inspector` サブエージェント / Human明示指示＋商用API時のみ外部 `sonnet_inspect.py`）**:
+   - **標準動作（デフォルト）**: 内蔵サブエージェント **`mindfulness-inspector`（`Model: "inherit"`、メインが Flash 時は `"pro"`）** を `invoke_subagent` で起動し、ステージ1指摘と対象パスを渡して `[CONFIRMED / UNVERIFIED / REJECTED]` の3分類再検査を実行します（Consumer OAuth 保護および意図しない API 従量課金防止のため、通常時は外部 CLI を自動実行しません）。
+   - **Human 明示指示時のみ（商用 `ANTHROPIC_API_KEY` 必須）**: 人間が明示的に外部 Fable 5.2 API での Stage 2 再検査を指示した場合に限り、`--human-authorized` 付きで `sonnet_inspect.py` を実行できます（API キー未設定時は `exit 2` で自動ブロックされるため、直ちに内蔵 `mindfulness-inspector` へフォールバックします）：
+     ```bash
+     python3 ~/.gemini/config/plugins/multi-agent-kit/skills/multi-agent-opinion/scripts/sonnet_inspect.py \
+       --human-authorized \
+       --findings <ステージ1指摘.md> --target <対象パス> [--target ...] \
+       --repo <作業ディレクトリ> --out <artifactDir>/sonnet_inspection.md
+     ```
 2. **複合リスク・アーキテクチャ整合性監査（`Model: "inherit"`）**:
    - Tier 2 では変更内容に関連する `cross-domain-combinatorial-auditor`（複合状態・競合）および/または `system-architecture-coherence-auditor`（レイヤ境界・DRY）の1〜2体、Tier 3 では両方を並行起動します。
 

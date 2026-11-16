@@ -1116,14 +1116,19 @@ def run_check() -> int:
     # 5. Hook smoke tests
     run_hook_smoke_tests(errors, node_bin)
 
-    # 6. Fallback smoke test (simulate machine WITHOUT `claude` CLI)
+    # 6. Fallback & Anthropic ToS Guard smoke tests (6a: CLI absent, 6b: Consumer OAuth blocked, 6c: missing --human-authorized blocked, 6d: commercial API + --human-authorized runs --bare with OAuth stripped)
+    external_scripts = [
+        "gemini/config/plugins/claude-orchestrator-kit/skills/ask-fable/scripts/ask_fable.py",
+        "gemini/config/plugins/claude-orchestrator-kit/skills/claude-exit-review/scripts/exit_review.py",
+        "gemini/config/plugins/multi-agent-kit/skills/multi-agent-opinion/scripts/sonnet_inspect.py",
+    ]
+    if not (REPO_ROOT / "gemini/config/plugins/claude-orchestrator-kit/skills/ask-opus/SKILL.md").is_file():
+        errors.append("[MISSING_SKILL] ask-opus/SKILL.md is missing")
+
     with tempfile.TemporaryDirectory() as empty_home:
+        # 6a. CLI absent -> exit=2 & [FALLBACK_TO_NATIVE_SUBAGENT]
         clean_env = {"HOME": empty_home, "PATH": "/usr/bin:/bin", "CLAUDE_CLI_PATH": "/nonexistent/claude"}
-        for script_rel in [
-            "gemini/config/plugins/claude-orchestrator-kit/skills/ask-fable/scripts/ask_fable.py",
-            "gemini/config/plugins/claude-orchestrator-kit/skills/claude-exit-review/scripts/exit_review.py",
-            "gemini/config/plugins/multi-agent-kit/skills/multi-agent-opinion/scripts/sonnet_inspect.py",
-        ]:
+        for script_rel in external_scripts:
             r = subprocess.run(
                 [sys.executable, str(REPO_ROOT / script_rel), "--check"],
                 capture_output=True,
@@ -1132,9 +1137,135 @@ def run_check() -> int:
             )
             if r.returncode != 2 or "[FALLBACK_TO_NATIVE_SUBAGENT]" not in r.stderr:
                 errors.append(
-                    f"[FALLBACK_TEST_FAIL] {script_rel} --check expected exit=2 & [FALLBACK_TO_NATIVE_SUBAGENT], "
+                    f"[FALLBACK_TEST_FAIL] 6a {script_rel} --check expected exit=2 & [FALLBACK_TO_NATIVE_SUBAGENT], "
                     f"got exit={r.returncode} stderr={r.stderr.strip()!r}"
                 )
+
+        # Prepare mock `claude` binary + git repo fixture for 6b / 6c / 6d
+        eh = Path(empty_home)
+        mock_cli = eh / "mock_claude"
+        marker_file = eh / "claude_invoked.json"
+        mock_cli.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, pathlib, sys\n"
+            f"pathlib.Path({str(marker_file)!r}).write_text(json.dumps({{\n"
+            "    'argv': sys.argv[1:],\n"
+            "    'has_oauth': 'CLAUDE_CODE_OAUTH_TOKEN' in os.environ,\n"
+            "    'has_api_key': bool(os.environ.get('ANTHROPIC_API_KEY')),\n"
+            "}), encoding='utf-8')\n"
+            "print(json.dumps({\n"
+            "    'result': 'Mock advice\\n[VERIFICATION: CONFIRMED] [LOGIC] [MAJOR] a.ts:1 - ok\\nVERDICT: PASS',\n"
+            "    'is_error': False,\n"
+            "    'modelUsage': {'claude-fable-5-2': {'inputTokens': 10, 'outputTokens': 10}},\n"
+            "    'total_cost_usd': 0.01,\n"
+            "}))\n",
+            encoding="utf-8",
+        )
+        mock_cli.chmod(0o755)
+
+        fx_repo = eh / "fx_repo"
+        fx_repo.mkdir()
+        git_bin_fx = shutil.which("git")
+        if git_bin_fx:
+            subprocess.run([git_bin_fx, "init", "-q"], cwd=fx_repo, check=True)
+            subprocess.run([git_bin_fx, "config", "user.email", "t@example.com"], cwd=fx_repo, check=True)
+            subprocess.run([git_bin_fx, "config", "user.name", "T"], cwd=fx_repo, check=True)
+            (fx_repo / "a.ts").write_text("export const a = 1;\n", encoding="utf-8")
+            subprocess.run([git_bin_fx, "add", "."], cwd=fx_repo, check=True)
+            subprocess.run([git_bin_fx, "commit", "-q", "-m", "init"], cwd=fx_repo, check=True)
+
+        criteria_md = eh / "criteria.md"
+        criteria_md.write_text("- INV-1: ok\n", encoding="utf-8")
+        findings_md = eh / "findings.md"
+        findings_md.write_text("- finding 1\n", encoding="utf-8")
+        out_md = eh / "out.md"
+
+        exec_args_map = {
+            external_scripts[0]: ["--topic", "arch check", "--repo", str(fx_repo), "--out", str(out_md)],
+            external_scripts[1]: ["--repo", str(fx_repo), "--criteria", str(criteria_md), "--out", str(out_md)],
+            external_scripts[2]: ["--findings", str(findings_md), "--repo", str(fx_repo), "--out", str(out_md)],
+        }
+
+        # 6b. Consumer OAuth only (NO commercial API key, even with --human-authorized & CLAUDE_CODE_OAUTH_TOKEN) -> MUST block without spawning claude
+        oauth_only_env = {
+            "HOME": empty_home,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "CLAUDE_CLI_PATH": str(mock_cli),
+            "CLAUDE_CODE_OAUTH_TOKEN": "consumer-oauth-token-must-never-be-used",
+        }
+        for script_rel in external_scripts:
+            for extra in (["--check"], ["--human-authorized", *exec_args_map[script_rel]]):
+                if git_bin_fx or "--repo" not in extra:
+                    r_b = subprocess.run(
+                        [sys.executable, str(REPO_ROOT / script_rel), *extra],
+                        capture_output=True,
+                        text=True,
+                        env=oauth_only_env,
+                    )
+                    if (
+                        r_b.returncode != 2
+                        or "[BLOCKED_CONSUMER_OAUTH]" not in r_b.stderr
+                        or "[FALLBACK_TO_NATIVE_SUBAGENT]" not in r_b.stderr
+                        or marker_file.exists()
+                    ):
+                        errors.append(
+                            f"[TOS_GUARD_FAIL] 6b {script_rel} {extra[0]} expected Consumer OAuth block (exit=2, zero CLI spawn), "
+                            f"got exit={r_b.returncode} spawned={marker_file.exists()} stderr={r_b.stderr.strip()!r}"
+                        )
+
+        # 6c. Commercial API key in ~/.gemini/.env: --check returns 0 (no key leak), execution WITHOUT --human-authorized -> blocked (exit=2, zero spawn)
+        fake_secret = "commercial-api-key-fixture-987654321"
+        (eh / ".gemini").mkdir(parents=True, exist_ok=True)
+        (eh / ".gemini" / ".env").write_text(f'ANTHROPIC_API_KEY="{fake_secret}"\n', encoding="utf-8")
+        comm_env = {
+            "HOME": empty_home,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "CLAUDE_CLI_PATH": str(mock_cli),
+            "CLAUDE_CODE_OAUTH_TOKEN": "should-be-stripped-from-child",
+        }
+        for script_rel in external_scripts:
+            r_c_chk = subprocess.run(
+                [sys.executable, str(REPO_ROOT / script_rel), "--check"],
+                capture_output=True,
+                text=True,
+                env=comm_env,
+            )
+            if r_c_chk.returncode != 0 or fake_secret in (r_c_chk.stdout + r_c_chk.stderr) or marker_file.exists():
+                errors.append(
+                    f"[TOS_GUARD_FAIL] 6c {script_rel} --check with .env API key expected exit=0 & zero secret leak, "
+                    f"got exit={r_c_chk.returncode} stdout={r_c_chk.stdout!r}"
+                )
+            if git_bin_fx:
+                r_c_noauth = subprocess.run(
+                    [sys.executable, str(REPO_ROOT / script_rel), *exec_args_map[script_rel]],
+                    capture_output=True,
+                    text=True,
+                    env=comm_env,
+                )
+                if r_c_noauth.returncode != 2 or "--human-authorized" not in r_c_noauth.stderr or marker_file.exists():
+                    errors.append(
+                        f"[TOS_GUARD_FAIL] 6c {script_rel} without --human-authorized expected exit=2 & zero CLI spawn, "
+                        f"got exit={r_c_noauth.returncode} spawned={marker_file.exists()}"
+                    )
+
+                # 6d. Commercial API key + --human-authorized -> exit=0, --bare passed, CLAUDE_CODE_OAUTH_TOKEN stripped
+                marker_file.unlink(missing_ok=True)
+                r_d = subprocess.run(
+                    [sys.executable, str(REPO_ROOT / script_rel), "--human-authorized", *exec_args_map[script_rel]],
+                    capture_output=True,
+                    text=True,
+                    env=comm_env,
+                )
+                if r_d.returncode != 0 or not marker_file.is_file():
+                    errors.append(
+                        f"[TOS_GUARD_FAIL] 6d {script_rel} authorized commercial run expected exit=0, "
+                        f"got exit={r_d.returncode} stderr={r_d.stderr.strip()!r}"
+                    )
+                else:
+                    inv = json.loads(marker_file.read_text(encoding="utf-8"))
+                    if "--bare" not in inv.get("argv", []) or inv.get("has_oauth") is not False or inv.get("has_api_key") is not True:
+                        errors.append(f"[TOS_GUARD_FAIL] 6d {script_rel} expected --bare & stripped OAuth, got {inv}")
+                marker_file.unlink(missing_ok=True)
 
     # 7a. Clean empty home default install (verifies process-review-gate auto-installed when node exists) -> uninstall must leave ZERO files behind
     with tempfile.TemporaryDirectory() as clean_home_str:

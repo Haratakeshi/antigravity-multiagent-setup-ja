@@ -1,29 +1,24 @@
-# カスタマイズ・環境別運用ガイド (Customization & Fallback Guide)
+# カスタマイズ・環境別運用ガイド (Customization & Compliance Guide)
 
-他の PC や異なる開発環境へ導入した際のカスタマイズ方法と、外部ツール有無による動作の違いをまとめています。
+他の PC や異なる開発環境へ導入した際のカスタマイズ方法と、標準の内蔵 Opus 運用および外部 API 利用時の規約保護設計をまとめています。
 
 ---
 
-## 1. Claude Code (`claude` CLI) がある環境 vs 無い環境
+## 1. 標準の内蔵 `Claude Opus 5.5 (High)` (`ask-opus`) と、重要局面限定の外部 API (`ask-fable`)
 
-本セットアップは **Claude Code がインストールされていない PC でも 100% 動作** します。
+本セットアップは **外部 CLI や API キーが一切なくても、Antigravity 内蔵モデルだけで 100% 動作** し、かつ Anthropic / Google 双方の利用規約（ToS）を厳格に遵守する2段構成を採っています。
 
-### 仕組み
-`ask_fable.py`、`exit_review.py`、`sonnet_inspect.py` は実行時に以下の順序で `claude` バイナリを自動探索します：
-1. 環境変数 `CLAUDE_CLI_PATH`
-2. `PATH` 上の `claude` (`shutil.which("claude")`)
-3. `~/.local/bin/claude`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude`, Windows 標準パス
+### ① 日常・標準運用: `ask-opus`（100% Antigravity 内蔵・追加 API 課金ゼロ）
+- メインモデルが `Gemini 4 Carbon` 等の場合でも、`ask-opus` スキルは Antigravity 標準の単一モデルピン留め機能（`swarm` の `model: "claude-opus-5-5-high"`）を使って **Antigravity 内蔵の `Claude Opus 5.5 (High)`** を独立クリーンコンテキストで召喚し、別ベンダー目線のセカンドオピニオンを取得します（メインが既に内蔵 Opus の Mode C では `senior-architect-advisor` を起動）。
+- 出口反証ゲート（Tier 1）は内蔵 `second-opinion-lite` / `carbon-verifier`、Stage 2 事実再検査は内蔵 `mindfulness-inspector` が標準で動作します。
 
-もし見つからない場合（または未ログインの場合）、スクリプトはクラッシュせず `exit code 2` と `[FALLBACK_TO_NATIVE_SUBAGENT]` 指示を返し、Antigravity エージェントは自動的に以下の **Antigravity 内蔵サブエージェント** を起動します：
+### ② 重要タスク限定の外部 API 呼び出し: `ask-fable`（Human 明示指示 ＋ 商用 API キー必須）
+Anthropic の個人向け利用規約（Consumer Terms of Service）では、個人定額サブスクリプション（`claude.ai` Free/Pro/Max/Ultra の OAuth セッション）へ他社エージェントやスクリプトから自動アクセスすることが禁止されています。そのため `ask_fable.py`、`exit_review.py`、`sonnet_inspect.py` には以下の **二重のハードウェア級ロック** が組み込まれています：
 
-- `ask-fable` ➔ **`senior-architect-advisor`** サブエージェント
-- `claude-exit-review` ➔ **`carbon-verifier`** サブエージェント
-- `multi-agent-opinion` Stage 2 ➔ **`mindfulness-inspector`** サブエージェント
-
-### 💡 Antigravity 内蔵の Opus / Sonnet を使いたい場合のおすすめ運用
-Claude Code CLI を入れていない環境で Claude Opus や Sonnet の視点が欲しい場合は、**Antigravity のモデルピッカーで内蔵の `Claude Opus` または `Claude Sonnet` を選択（Mode C）** してください。
-- 日常の調査・実装・テストは `claude-orchestrator-kit` のルールにより自動的に高速な `Gemini Flash` サブエージェントへ委譲されるため、内蔵 Claude のクオータをほとんど消費しません。
-- そして設計相談（`senior-architect-advisor`）や出口レビュー（`carbon-verifier`）を `Model: "inherit"` で呼んだ瞬間だけ、**Antigravity 内蔵の Claude Opus / Sonnet 自身が独立コンテキストのサブエージェントとして起動**します。
+1. **Human 明示承認ロック（`--human-authorized` 必須）**:
+   エージェントが自律判断で勝手に外部有料 API を叩くことはできません。人間がプロンプトで明示的に `ask-fable`（外部 Fable 5.2 API 利用）を指示したときのみ実行されます。
+2. **商用 API 認証ロック ＆ 公式 `--bare` モード強制**:
+   環境変数 `ANTHROPIC_API_KEY` または `~/.gemini/.env`（パーミッション `600` 推奨）内の `ANTHROPIC_API_KEY=<YOUR_ANTHROPIC_API_KEY>`（もしくは Bedrock / Vertex AI / Foundry 商用認証）が設定されていない場合、スクリプトは `claude` バイナリを起動する前に即座に `exit code 2`（`[BLOCKED_CONSUMER_OAUTH]`）で停止し、内蔵の `ask-opus` / 内蔵サブエージェントへフォールバックします。実行時も公式 `--bare` フラグを強制するため、Keychain や `claude.ai` OAuth トークンは一切読み取られません。
 
 ---
 

@@ -74,7 +74,7 @@ agents:
 2. **ステージ1並行起動 (`Model: "flash"`)**:
    - Tier 2（選抜3〜6体）または Tier 3（全15体）を `invoke_subagent` で並行起動し、`schedule`（`DurationSeconds=180, TimerCondition="never"`）を設定する。全 `[CLEAN]` ならステージ2を省略し Clean Pass とする。
 3. **ステージ2再検査・複合監査**:
-   - **事実再検査**: `sonnet_inspect.py` を実行する。終了コード `2`（Claude CLI 不在・制限）の場合は直ちに内蔵サブエージェント `mindfulness-inspector`（`Model: "inherit"`、親が Flash 時は `"pro"`）を `invoke_subagent` で起動して `[CONFIRMED / UNVERIFIED / REJECTED]` 判定を取得する。
+   - **事実再検査**: 既定では内蔵サブエージェント `mindfulness-inspector`（`Model: "inherit"`、親が Flash 時は `"pro"`）を `invoke_subagent` で起動して `[CONFIRMED / UNVERIFIED / REJECTED]` 判定を取得する（親から「Human が外部 Fable API 再検査を明示指示した」と伝達された場合のみ `sonnet_inspect.py --human-authorized` を試行し、終了コード `2` なら `mindfulness-inspector` を起動する）。
    - **複合・整合性監査**: Tier 2 では関連する監査役（`cross-domain-combinatorial-auditor` / `system-architecture-coherence-auditor` の1〜2体、`Model: "inherit"`）、Tier 3 では両方を並行起動する。
 4. **統合レポート出力 & デッドロック防止通知（v2.30+ パス制約厳守）**:
    - Antigravity v2.30+ では親の `brain/` ディレクトリへの `write_to_file` はブロックされるため、必ず**自身の artifact ディレクトリ（`<appDataDir>/brain/<自身のconversation-id>/second_opinion_report.md`, `ArtifactMetadata` 付き）**へ出力する。
