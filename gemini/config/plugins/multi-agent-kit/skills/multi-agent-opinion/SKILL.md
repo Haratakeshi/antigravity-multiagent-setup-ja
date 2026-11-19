@@ -5,7 +5,11 @@ description: Risk-scaled multi-agent clean-room review pipeline (Tier 0-3, 3-str
 
 # Multi-Agent Second Opinion Review Skill（リスク比例・複眼型セカンドオピニオン）
 
-コード実装・設計提案・3ストライク課題に対し、変更リスクと速度要件に応じた **Tier 0〜3 の4段階スケーリング** で独立サブエージェント監査とマインドフルネス事実再検査を実行する標準パイプラインです。各専門エージェントのプロンプト正本（SSOT）は `~/.gemini/config/plugins/multi-agent-kit/agents/*.md` に格納されており、本ファイルには重複記載しません。
+コード実装・設計提案・3ストライク課題に対し、変更リスクと速度要件に応じた **Tier 0〜3 の4段階スケーリング** で独立監査とマインドフルネス事実再検査を実行する標準パイプラインです。各専門エージェントのプロンプト正本（SSOT）は `~/.gemini/config/plugins/multi-agent-kit/agents/*.md` に格納されており、本ファイルには重複記載しません。
+
+- **2レーンハイブリッド設計（理念 SSOT × モデル追従の分離）**:
+  - **Lane 1（通常レーン・`invoke_subagent`）**: Tier 1（`second-opinion-lite` / `carbon-verifier`）および日常の軽量 Tier 2 では、機械的 Read-Only・完全隔離・最速の `invoke_subagent`（`flash` / `inherit` / `pro` — 本体アップデートで最新世代へ自動追従）を使用します。
+  - **Lane 2（Swarm 動的モデル解決パネル・`swarm`）**: 節目の重要設計・大型アップデートの総合反証・最新世代モデルの明示指名・異種ベンダー（Gemini × Claude）複眼レビューが必要な場合は、**§4 の動的モデル解決パネル**を使用します（`swarm(action="models")` で実行時にモデル解決するため世代固定なし）。
 
 ---
 
@@ -15,7 +19,7 @@ description: Risk-scaled multi-agent clean-room review pipeline (Tier 0-3, 3-str
 |---|---|---|---|
 | **Tier 0（軽微変更のみ）** | 文書・設定・文言/CSS微調整・単一コード`25行未満`の微修正（実装委譲なし） | メインエージェント自身の差分確認＋テスト実行＋`§0.5` セルフレビューのみで即時完了（監査サブエージェント自動起動なし） | ゼロ |
 | **Tier 1（実装出口ゲート・既定）** | **`flash-implementer` 委譲後** / コード`2ファイル以上`または`25行以上`の通常実装・バグ修正 / 明示依頼 | 通常ロジックは高速な `second-opinion-lite`（Flash並列読取・1〜2分）、重要状態遷移・認証・決済・視覚判定・リリース直前は `carbon-verifier`（`Model: "inherit"`, 12往復上限） | 極小 |
-| **Tier 2（標準 `multi-agent-opinion`）** | 共有状態・認証・API契約・状態遷移・複数モジュール変更 | Stage 1 **ドメイン選抜 3〜6体**（`Model: "flash"`）＋ Stage 2（再検査＋関連監査1〜2体） | 中 |
+| **Tier 2（標準 `multi-agent-opinion`）** | 共有状態・認証・API契約・状態遷移・複数モジュール変更 | Lane 1: Stage 1 **ドメイン選抜 3〜6体**（`Model: "flash"`）＋ Stage 2（再検査＋関連監査1〜2体）、または Lane 2: **§4 Swarm 動的モデル解決パネル** | 中 |
 | **Tier 3（フルゲート）** | リリース前最終監査 / 明示的な「フル15体」指定 / **モードB（3ストライク）** | Stage 1 **全15体**（`Model: "flash"`）＋ Stage 2 **全3体** | 大（ここぞの場面のみ） |
 
 - **タイムアウト**: Stage 1 `180秒` / Stage 2 `180秒`（親待機フォールバック `360秒`）
@@ -86,3 +90,34 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
    - 構成: `1. Executive Summary` / `2. CONFIRMED Findings` / `3. Combinatorial & Architecture Risks` / `4. UNVERIFIED` / `5. REJECTED (反証根拠つき)` / `6. Action Queue`。
 2. **最優先通知**: クリーンアップコマンドより前に、必ず `send_message` で親へ5行以内の要約とレポート絶対パスを送信します。
 3. **安全な後始末**: `/tmp/<具体名>` 以外のパスに対する `rm` は `guard_commands.py` の `force_ask` によりバックグラウンドで停止するため、`brain/.../scratch/` 配下の一時ファイル破棄は空文字上書き（`Overwrite: true`）を使用し（`/tmp/<具体名>` 配下のみ `rm -rf /tmp/<具体名>` が自動許可されます）、`manage_subagents(Action="kill_all")` で子エージェントを終了します。
+
+---
+
+## 4. Swarm 動的モデル解決パネル（最新モデル指名・異種ベンダー複眼監査レーン）
+
+日常の Tier 1 / 軽量 Tier 2 は軽量・機械的 Read-Only・完全隔離の **Lane 1（`invoke_subagent`）** を維持しつつ、**節目の重要設計・大型アップデートの総合反証・最新世代モデルの明示指名・異種ベンダー（Gemini × Claude）複眼レビュー** では本節の **Lane 2（Swarm 動的モデル解決パネル）** を使用します。
+
+- **設計原則（理念 SSOT とモデル選定の分離）**:
+  - `~/.gemini/config/plugins/*/agents/*.md` は「何を守り、どう反証し、どの形式で返すか」の純粋な理念正本（SSOT）として使い回し、プロンプトやスキルに世代固定のモデル ID をハードコードしません。
+  - `swarm` ツールはトップレベルのメインエージェントのみ所持するため、本レーンはメインエージェントから直接起動します（`multi-agent-opinion` サブエージェント内からは `swarm` 非対応のため Lane 1 を使用）。
+
+### Step 1: 動的モデル解決（ハードコード禁止）
+1. 起動直前に **`swarm(action="models", all=True)`** を1回呼び出し、その時点で利用可能な最新モデル一覧と `quota_remaining` を取得します（※Gemini 群と Claude / GPT-OSS 群は別クォータ枠で計算されるため、異種ベンダー併用は精度向上とクォータ分散の両方に効きます）。
+2. 一覧と残クォータから、次の **能力ポリシー** に従って実行モデルを動的決定します（対象モデルが `0%` の場合はフォールバック順へ切替）：
+   - **高速広域スキャン枠（Fast Tier）**: 一覧中の最新 Gemini 高速実行系 `high`（例: `gemini-4-hydrogen-high`、残 `0%` 時は同 `medium` または次点の最新高速系）
+   - **同系最上位・深掘り枠（Frontier Tier）**: 一覧中の最新 Gemini 上位系の標準/高推論（例: `gemini-4-neon-high`、極限のセキュリティ・長距離検証時は `gemini-4-carbon-medium` / `high`。単純タスクでの overthinking を避けるため `xhigh` は明示要求時のみ）
+   - **異種ベンダー反証枠（Cross-Vendor Tier）**: 一覧中の最新内蔵 `claude-opus-*-high`（例: `claude-opus-5-5-high`、残 `0%` 時は最新 `claude-opus-*-medium` → 最新 `claude-sonnet-*-high`）
+
+### Step 2: Phase 1 — 独立並列査読（同調バイアス防止・1ターン同時 `add`）
+1. §2 のマトリクスから変更内容に直結する直交ロール **2〜4体**（例: Fast 枠 1〜2体 ＋ Frontier 枠 1体 ＋ Cross-Vendor 枠 1体）を選抜し、**1ターンで同時に `swarm(action="add", ...)`** を発行して、そのターンは他のボードツールを呼ばずに終了します（ナレーター・モニター不要）。
+2. **命名規則（`process-review-gate.mjs` 連動）**: 必ず `"workspace": "inherit"` とし、`name` は **`review-<role>` / `audit-<role>` / `verifier-<role>` / `opus-refuter` 等**（`review|reviewer|audit|auditor|verify|verifier|refute|refuter|inspector|critic|panel` の語を含み、`advisor|monitor|narrator` を含まない）にします。
+3. 各ワーカーの `brief` には以下の4点を必ず明記します：
+   1. 最初に担当する理念 SSOT ファイル（例: `~/.gemini/config/plugins/multi-agent-kit/agents/<role>.md` や `~/.gemini/config/plugins/claude-orchestrator-kit/agents/carbon-verifier.md`）を `read_file` で読み込み、その重点チェックリストと出力形式を厳守すること。
+   2. **Read-Only 厳守**: 製品コード・設定ファイルの編集（`write_file` / `edit_file`）や破壊的コマンド実行は一切禁止（読取・検索・`git diff` 確認のみ可）。
+   3. **クリーンルーム独立性**: Phase 1 では他メンバーのボード投稿を参照・追随せず、指定された差分・対象ファイル・不変条件のみから独立所見を導き `@coordinator [done]` で1投稿にまとめて報告すること（追加ヘルパーは起動しない）。
+   4. 対象リポジトリ・差分/ファイルパス・不変条件仕様（※作成経緯や言い訳は渡さない）。
+
+### Step 3: Phase 2 — 意見割れ時のみクロス反証 ＆ 事実照合・後始末
+1. 起床後、`read_board(since=0)` で全ワーカーの独立所見を取得します。
+2. Gemini 枠と Claude 枠などで `CRITICAL` / `MAJOR` の判定が割れた指摘がある場合のみ、該当投稿番号（`#seq`）を指してピンポイントにボード上でクロス反証させます（例: `@opus-refuter #4 の指摘を実コード file:line で反証検証して`）。
+3. 最終的にメイン（または `mindfulness-inspector`）が全指摘を実コード・一次仕様と照合して `CONFIRMED / UNVERIFIED / REJECTED` を確定し、役割を終えた監査ワーカーを **`swarm(action="kill", name="...")`** でクリーン終了します。

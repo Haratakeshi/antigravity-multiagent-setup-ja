@@ -86,7 +86,7 @@ flowchart TD
   "Prompt": "以下の画像および合格基準に基づき、視覚的検証を実施してください。\n\n【検査対象画像】\nfile://<appDataDir>/brain/<conversation-id>/scratch/visual_proof_r1.png\n\n【合格基準チェックリスト】\n- [CRIT-01] ...\n- [CRIT-02] ...\n\n1項目でもNGがある場合は無条件で [FINAL_VERDICT: CRITICAL_FAIL] とし、具体的な修正指示を返してください。全項目が完全に達成されている場合のみ [FINAL_VERDICT: PASSED] を下してください。"
 }
 ```
-（※Gemini 4 Carbon オーケストレーターモードの最終ゲート目視確認では、`carbon-verifier` またはメイン自身が画像を確認します。）
+（※Gemini 4 系オーケストレーターモード（Neon / Carbon 等）の最終ゲート目視確認では、`carbon-verifier` またはメイン自身が画像を確認します。）
 
 ### Step 4: PDCA 反復制御
 - **`[FINAL_VERDICT: PASSED]`**: 全項目達成を確認し、画像パスと判定ログを証拠として完了報告（§1.1）。

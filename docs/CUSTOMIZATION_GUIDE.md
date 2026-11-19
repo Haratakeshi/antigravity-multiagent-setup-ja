@@ -4,13 +4,14 @@
 
 ---
 
-## 1. 標準の内蔵 `Claude Opus 5.5 (High)` (`ask-opus`) と、重要局面限定の外部 API (`ask-fable`)
+## 1. 標準の内蔵 Claude Opus 動的運用 (`ask-opus` / 2レーン監査) と、重要局面限定の外部 API (`ask-fable`)
 
 本セットアップは **外部 CLI や API キーが一切なくても、Antigravity 内蔵モデルだけで 100% 動作** し、かつ Anthropic / Google 双方の利用規約（ToS）を厳格に遵守する2段構成を採っています。
 
-### ① 日常・標準運用: `ask-opus`（100% Antigravity 内蔵・追加 API 課金ゼロ）
-- メインモデルが `Gemini 4 Carbon` 等の場合でも、`ask-opus` スキルは Antigravity 標準の単一モデルピン留め機能（`swarm` の `model: "claude-opus-5-5-high"`）を使って **Antigravity 内蔵の `Claude Opus 5.5 (High)`** を独立クリーンコンテキストで召喚し、別ベンダー目線のセカンドオピニオンを取得します（メインが既に内蔵 Opus の Mode C では `senior-architect-advisor` を起動）。
-- 出口反証ゲート（Tier 1）は内蔵 `second-opinion-lite` / `carbon-verifier`、Stage 2 事実再検査は内蔵 `mindfulness-inspector` が標準で動作します。
+### ① 日常・標準運用: `ask-opus` ＆ 2レーン複眼監査（100% Antigravity 内蔵・モデル世代自動追従）
+- メインモデルが `Gemini 4 Neon` / `Carbon` 等の場合でも、`ask-opus` スキルは毎回 **`swarm(action="models", all=True)` からその時点の最新内蔵 `Claude Opus (High)`（例: `claude-opus-5-5-high`）を動的選択** して独立クリーンコンテキスト召喚し、別ベンダー目線のセカンドオピニオンを取得します（メインが既に内蔵 Opus の Mode C では `senior-architect-advisor` を起動）。
+- 出口反証ゲート（Tier 1）は内蔵 `second-opinion-lite` / `carbon-verifier`、日常 Tier 2 と Stage 2 事実再検査は `invoke_subagent`（**Lane 1**: 最新版 Antigravity で `flash` → `Hydrogen High` へ自動追従）が標準で動作します。
+- 節目の大型設計や異種ベンダー（Gemini × Claude）複眼レビューでは `multi-agent-opinion` §4 の **Swarm 動的モデル解決パネル（Lane 2）** を起動でき、固定世代 ID なしで常に最新 Fast / Frontier / Claude モデルへ理念（`agents/*.md` SSOT）を渡せます。
 
 ### ② 重要タスク限定の外部 API 呼び出し: `ask-fable`（Human 明示指示 ＋ 商用 API キー必須）
 Anthropic の個人向け利用規約（Consumer Terms of Service）では、個人定額サブスクリプション（`claude.ai` Free/Pro/Max/Ultra の OAuth セッション）へ他社エージェントやスクリプトから自動アクセスすることが禁止されています。そのため `ask_fable.py`、`exit_review.py`、`sonnet_inspect.py` には以下の **二重のハードウェア級ロック** が組み込まれています：

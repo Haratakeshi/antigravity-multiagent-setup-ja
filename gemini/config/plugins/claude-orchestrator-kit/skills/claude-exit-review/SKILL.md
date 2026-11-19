@@ -1,13 +1,13 @@
 ---
 name: claude-exit-review
-description: Final-deliverable refutation and visual review gate (clean-room input = git diff + acceptance criteria + screenshots). Uses Antigravity's native `carbon-verifier` subagent (or built-in `Claude Opus 5.5 (High)` via swarm when requested) by default; runs external Claude Fable 5.2 (`exit_review.py`) ONLY on explicit Human instruction with commercial `ANTHROPIC_API_KEY`.
+description: "Final-deliverable refutation and visual review gate (clean-room input = git diff + acceptance criteria + screenshots). Uses Antigravity's native `carbon-verifier` subagent (or latest built-in Claude Opus (High) dynamically selected via `swarm`) by default; runs external Claude Fable 5.2 (`exit_review.py`) ONLY on explicit Human instruction with commercial `ANTHROPIC_API_KEY`."
 ---
 
 # claude-exit-review: クリーンルーム出口反証・視覚レビューゲート
 
 オーケストレーターモードの「出口ゲート」。実装ワーカーやメインエージェントが作った成果物を、作成経緯や言い訳を一切渡さないクリーンルーム条件（§3.4）で独立反証・目視レビューします。
 
-- **既定（標準ルート A — 100% Antigravity 内蔵・規約完全準拠）**: 内蔵サブエージェント **`carbon-verifier`**（または別モデル目線が必要な場合は `swarm` で内蔵 `claude-opus-5-5-high` を指名）を使用します。
+- **既定（標準ルート A — 100% Antigravity 内蔵・規約完全準拠）**: 内蔵サブエージェント **`carbon-verifier`**（または別モデル目線が必要な場合は `swarm(action="models")` で動的選択した **最新内蔵 Claude Opus (High)**）を使用します。
 - **外部 API ルート B（Human 明示指示 ＋ 商用 `ANTHROPIC_API_KEY` 限定）**: 人間が明示的に外部 Fable 5.2 API レビューを指示し、かつ商用 `ANTHROPIC_API_KEY`（または Bedrock / Vertex / Foundry）が設定されている場合のみ `exit_review.py --human-authorized` を実行します（Consumer Pro/Max OAuth は規約保護のため機械的にブロックされます）。
 
 ---
@@ -15,8 +15,8 @@ description: Final-deliverable refutation and visual review gate (clean-room inp
 ## 実行ルート A（既定・標準）: Antigravity 内蔵 `carbon-verifier` サブエージェント
 
 通常の Tier 1 出口反証ゲート（および Mode C 内蔵 Claude 利用時）では、外部 CLI を呼ばず直ちに `invoke_subagent` で **`carbon-verifier`** を起動します：
-- メインモデルが **Gemini 4 Carbon / Argon** または **内蔵 Claude Opus / Sonnet** の場合: `Model: "inherit"`
-- メインモデルが **Gemini Flash** の場合: `Model: "pro"`
+- メインモデルが **Gemini 4 系上位（Neon / Carbon / Argon 等）** または **内蔵 Claude Opus / Sonnet** の場合: `Model: "inherit"`
+- メインモデルが **Gemini 高速実行系（Hydrogen / Flash）** の場合: `Model: "pro"`
 
 ```json
 {

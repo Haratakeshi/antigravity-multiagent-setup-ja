@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![PRs: Not Accepted (Fork Friendly)](https://img.shields.io/badge/PRs-Not%20Accepted%20(Fork%20Friendly)-orange.svg)](./CONTRIBUTING.md)
-[![Antigravity: v2.30+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Carbon%20Optimized%20v1.5-4285F4.svg)](#-v15-アップデート-smart-出口反証ゲート--zero-tax-3層無限ループ防衛--claude-fable-52-統合)
+[![Antigravity: v2.32+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Neon%20%2F%20Carbon%20v1.6-4285F4.svg)](#-v16-アップデート-理念ssot--swarm動的モデル解決2レーン設計--gemini-4-neon--hydrogen-対応)
 
-Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Carbon / Flash / Antigravity 内蔵 Claude Opus 5.5 (High) のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
+Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（2レーン・3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Neon / Carbon / Hydrogen / 最新内蔵 Claude Opus (High) のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
 
 > [!NOTE]
 > **📖 オープン公開ポリシー（閲覧・利用・Fork 自由 / PR 受付なし）**
@@ -12,22 +12,19 @@ Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・�
 
 ---
 
-## 🆕 v1.5 アップデート: Smart 出口反証ゲート ＆ Zero-Tax 3層無限ループ防衛 ＆ 内蔵 Opus 標準軍師 (`ask-opus`) / ToS 完全準拠ガード
+## 🆕 v1.6 アップデート: 理念SSOT × Swarm動的モデル解決（2レーン設計） ＆ Gemini 4 Neon / Hydrogen 対応
 
-実稼働20時間テレメトリ観測と利用規約・クリーンルーム反証監査に基づき、**オーケストレーター実装後の監査漏れゼロ化・無限ループ自動遮断・Antigravity 内蔵 Claude Opus 5.5 (High) 標準軍師化と外部 API 規約保護ロック**を反映しました（v1.4 の高速パス・`/tmp` 安全削除対応もすべて包含）：
+モデルの世代交代（`Gemini 4 Neon`・`Gemini 4 Hydrogen` 等）に左右されず、常に最新・異種ベンダーの頭脳でクリーンルーム監査を行えるよう、**「理念正本（`agents/*.md` SSOT）とモデル選定の分離」** を実施しました（v1.5 のスマート出口反証ゲート・Zero-Tax 3層防衛・ToS ガード・高速パスもすべて包含）：
 
-1. **スマート出口反証ゲート付きの 4段階レビュースケーリング（Tier 0〜3 & Smart `process-review-gate.mjs` v1.5 標準導入）**:
-   - 文書・設定・CSS・単一コード`25行未満`の微修正（実装委譲なし・空 `catch` なし）は **Tier 0（メイン自身の差分・テスト確認＋`§0.5` セルフレビューで即時完了）** として 0 秒素通し。
-   - **`flash-implementer` 等への実装委譲後**、またはプロダクトコード **`2ファイル以上` / 追加・変更 `25行以上`**（同一ターン内 `git commit` 含む）の通常実装時は **Tier 1 必須出口ゲート**（通常ロジックは高速な `second-opinion-lite`、状態遷移・認証・決済・視覚判定は内蔵 `carbon-verifier`）を機械的にも強制し、複数行空 `catch {}` の混入も `-U3` hunk 比較で即座にブロック。
-2. **Zero-Tax 3層 Anti-Hang（Tasks / Subagent 無限ループ・対話待ち防衛）**:
-   - **第1層（`guard_commands.py` 事前 `deny`）**: 非デーモン実行での `vitest`（`run` 欠落・watch）・`jest --watch`・`playwright --ui/--debug`・`pytest --pdb`・`tail -f` を実行前にブロックし単発コマンドを案内。
-   - **第2層（プロセス内ハード上限 §9.4）**: 新規・一時検証スクリプト（`.py`/`.mjs`）に `faulthandler.dump_traceback_later(60, exit=True)` / `setTimeout(..., 60000).unref()` の自己終了タイマーを組み込み、無限ループ時も孤児プロセスを残さず即座に親を起こす。
-   - **第3層（実測 `p90` 基準・個別 ID 限定の適応型バックオフ監視）**: 長時間背景 Task・重厚 Subagent 起動時のみ個別の `TimerCondition="<TaskId>"` / `"<conversationId>"` で段階監視し、平時トークン税ゼロを維持。
-3. **標準軍師 `ask-opus`（Antigravity 内蔵 `Claude Opus 5.5 (High)`）と外部 API `ask-fable` の規約準拠2段分離**:
-   - 日常の設計相談・3ストライク打開は **Antigravity 内蔵の `claude-opus-5-5-high` を指名起動する標準スキル `ask-opus`** で完結（外部 CLI 不使用・追加 API 課金ゼロ・規約100%クリーン）。
-   - 外部 `claude-fable-5-2` を呼ぶ **`ask-fable`**（および外部レビュー系スクリプト）は、**「Human が明示指示（`--human-authorized`）」かつ「商用 `ANTHROPIC_API_KEY`（`~/.gemini/.env` 等）が設定済み」のときのみ公式 `--bare` モード（OAuth/Keychain 非読取）で動作** し、`claude.ai`（Pro/Max）個人サブスク OAuth 環境での意図せぬ規約抵触や勝手な API 従量課金を機械的に完全遮断。
-4. **15ファイル並列バッチ読取 ＆ `agy_tool_safety` 高速パス ＆ `/tmp` 安全削除・外付けSSD高速 Stop Hook**:
-   - 審査 `0ms` のネイティブ `read_file` / `grep` 15ファイル並列バッチ、素の `pnpm` / `uv` / `git -C` 単発実行（`cd <dir> &&` や不要な絶対パス審査の排除）、`inheritCustomizations: false` サブエージェントへの高速パス規律直接注入、`/tmp/<具体名>` 限定の安全な自動削除許可、および24時間周期の状態ファイル自動 GC を完備。
+1. **2レーンハイブリッド複眼監査（`multi-agent-opinion` v1.6 ＋ `process-review-gate.mjs` v1.5.2）**:
+   - **Lane 1（通常・高速レーン・`invoke_subagent`）**: 日常の Tier 1（`second-opinion-lite` / `carbon-verifier`）および軽量 Tier 2 は、機械的 Read-Only・完全隔離・最速の `invoke_subagent`（`flash` ティア＝最新版 Antigravity では `Gemini 4 Hydrogen High` に自動追従）を維持。
+   - **Lane 2（Swarm 動的モデル解決パネル・`swarm`）**: 節目の重要設計・大型アップデートの総合反証・最新モデル＋異種ベンダー（Gemini × Claude）複眼レビューでは、`swarm(action="models")` からその時点の最新 Fast / Frontier / Claude Opus High を動的解決し、`agents/*.md` の理念を注入して2フェーズ独立査読（`process-review-gate.mjs` v1.5.2 でも Read-Only `workspace: "inherit"` の Swarm 監査を正式認識）。
+2. **`ask-opus` の動的最新モデル追従 ＆ Gemini 4 Neon / Hydrogen 適応**:
+   - `ask-opus` は固定モデル ID をハードコードせず、`swarm(action="models")` からその時点の最新内蔵 `claude-opus-*-high`（例: `claude-opus-5-5-high`）を動的選択。`claude-orchestrator-kit` も `Gemini 4 Neon` / `Carbon` / `Hydrogen` 世代に対応済み。
+3. **スマート出口反証ゲート・Zero-Tax 3層 Anti-Hang・ToS 完全準拠ガード（v1.5 継続搭載）**:
+   - **Tier 0 ⇔ Tier 1+ 境界**: 文書・設定・CSS・単一コード`25行未満`の微修正は 0秒素通し。`flash-implementer` 委譲後や `>= 2` ファイル / `>= 25` 行変更時は `process-review-gate.mjs` が機械的に反証監査を確認（`-U3` hunk 比較で空 `catch {}` も遮断）。
+   - **Zero-Tax 3層 Anti-Hang**: `guard_commands.py` の無限待機コマンド事前 `deny` ＋ プロセス内ハード上限（§9.4）＋ 実測 `p90` 個別 ID 監視。
+   - **ToS 完全準拠2段分離**: 日常相談・監査は 100% Antigravity 内蔵モデルで完結し、外部 `claude-fable-5-2` スクリプトは「Human 明示指示（`--human-authorized`）」＋「商用 `ANTHROPIC_API_KEY`」時のみ `--bare` モード（OAuth/Keychain 非読取）で動作。
 
 **既存環境からのアップデート方法**（初回導入時のバックアップベースラインはそのまま安全に保持されます）：
 ```bash
@@ -109,7 +106,7 @@ flowchart TB
 ### 1. コア憲法 (`gemini/GEMINI.md`)
 | 節 | 内容 |
 |---|---|
-| **§0 Reasoning Protocol** | Internal-First PAC（高シグナル4地点開示）、サプライズの昇格、**3ストライク視点リセット**（`mindfulness` → 標準 `ask-opus`［内蔵 Opus 5.5 High］または `multi-agent-opinion` モードB）、着手前の前提検証、証拠出自に基づく確信度校正、完了前セルフレビュー |
+| **§0 Reasoning Protocol** | Internal-First PAC（高シグナル4地点開示）、サプライズの昇格、**3ストライク視点リセット**（`mindfulness` → 標準 `ask-opus`［最新内蔵 Claude Opus High 動的選択］または `multi-agent-opinion` モードB）、着手前の前提検証、証拠出自に基づく確信度校正、完了前セルフレビュー |
 | **§1 Output Discipline** | 自己評価の証拠義務（コマンド＋exit code / `file:line`）、機能ベースの役割名、迎合抑止（疑問文の中立解釈） |
 | **§2 Side-Effect Boundary** | 書き込み境界、不可逆・外部送信操作の Human Gate（`pending_human_review`）、Chrome 144+ DevTools 直結デッドロック禁止 |
 
@@ -120,7 +117,7 @@ flowchart TB
 | **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview`） |
 | **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
 | **`multi-axis-investigation-kit`** | 1つの発見で探索を止めない直交多軸調査・内外両面観測・反証チェック | スキル: `multi-axis-investigation` |
-| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と内蔵 Opus 軍師・出口監査ゲート | スキル: `ask-opus`（標準・内蔵 Opus 5.5 High）, `claude-exit-review`, `ask-fable`（Human明示＋商用API限定）<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
+| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と内蔵 Opus 軍師・出口監査ゲート | スキル: `ask-opus`（標準・最新内蔵 Claude Opus High 動的選択）, `claude-exit-review`, `ask-fable`（Human明示＋商用API限定）<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
 
 ### 3. 日常ワークフロー単体スキル (`gemini/config/skills/` & `tools/`)
 
@@ -136,11 +133,11 @@ flowchart TB
 
 `claude-orchestrator-kit` は、あなたが Antigravity のモデルピッカーで選んだメインモデルに合わせて自動で立ち回りを切り替えます：
 
-- **Mode A: `Gemini 4 Carbon`（または `Argon`）選択時【主力推奨】**
-  - **メイン（Carbon 直接実行）**: 要件分解・設計判断・コアロジック実装・**15ファイル以内（他プロジェクト横断含む）の並列 `read_file`/`grep`**・**10秒以内の単発コマンド**・スクリーンショット最終目視判定を直接高速処理（1ターン5〜15件並列ツールバッチ推奨）。
-  - **Flash ワーカー群**: 長大ログのフルビルド・全テスト実行（`flash-runner`）、**16ファイル以上または独立3軸以上の広域並列調査**（`flash-investigator`）、スコープ明確な定型実装（`flash-implementer`）へ委譲し、Carbon の思考トークン浪費と待ち時間（TTFT）を最小化。
-- **Mode B: `Gemini Flash` 選択時**
-  - 日常の軽微な改修や単発タスクをサブエージェント起動オーバーヘッドなしで最速直接実行。難所のみ `Model: "pro"` で上位サブエージェントを召喚。
+- **Mode A: `Gemini 4` 上位・オーケストレーター系（`Neon` / `Carbon` / `Argon` 等）選択時【主力推奨】**
+  - **メイン直接実行**: 要件分解・設計判断・コアロジック実装・**15ファイル以内（他プロジェクト横断含む）の並列 `read_file`/`grep`**・**10秒以内の単発コマンド**・スクリーンショット最終目視判定を直接高速処理（1ターン5〜15件並列ツールバッチ推奨）。
+  - **Flash / Hydrogen ワーカー群**: 長大ログのフルビルド・全テスト実行（`flash-runner`）、**16ファイル以上または独立3軸以上の広域並列調査**（`flash-investigator`）、スコープ明確な定型実装（`flash-implementer`）へ委譲し、上位モデルの思考トークン浪費と待ち時間（TTFT）を最小化。
+- **Mode B: `Gemini` 高速実行系（`Hydrogen` / `Flash`）選択時**
+  - 日常の軽微な改修や単発タスクをサブエージェント起動オーバーヘッドなしで最速直接実行。難所のみ `Model: "pro"`（または `ask-opus` / `multi-agent-opinion` §4 Swarm パネル）で上位モデルを召喚。
 - **Mode C: `Claude`（Antigravity 内蔵 Opus / Sonnet）選択時**
   - 入口（要件分解・設計）と出口（最終反証レビュー）だけを Claude が担い、中間の調査・実装・テスト実行をすべて Flash サブエージェントに任せることで Claude クオータを大幅に節約。
 
@@ -152,9 +149,9 @@ flowchart TB
 
 | 機能・スキル | 標準動作（デフォルト・追加課金ゼロ・規約100%クリーン） | Human 明示指示 ＋ 商用 `ANTHROPIC_API_KEY` 設定時のオプション動作 |
 |---|---|---|
-| **`ask-opus` / `ask-fable`**（軍師・設計相談） | **`ask-opus`**: Antigravity 内蔵 **`Claude Opus 5.5 (High)` (`claude-opus-5-5-high`)** を単一クリーンルーム起動（Mode C 時は `senior-architect-advisor`） | **`ask-fable`**: Human が明示指示（`--human-authorized`）した重要タスクのみ、`--bare` モード（OAuth非読取）で外部 `claude-fable-5-2` API に読取専用相談 |
+| **`ask-opus` / `ask-fable`**（軍師・設計相談） | **`ask-opus`**: `swarm(action="models")` でその時点の最新内蔵 **`Claude Opus (High)`**（例: `claude-opus-5-5-high`）を動的選択し単一クリーンルーム起動（Mode C 時は `senior-architect-advisor`） | **`ask-fable`**: Human が明示指示（`--human-authorized`）した重要タスクのみ、`--bare` モード（OAuth非読取）で外部 `claude-fable-5-2` API に読取専用相談 |
 | **`claude-exit-review`**（出口反証監査） | 内蔵サブエージェント **`carbon-verifier`**（または通常ロジックは `second-opinion-lite`）が差分＋画像を高速バッチ監査 | Human 明示指示時のみ `exit_review.py --human-authorized`（`--bare` + 商用 API キー必須）で外部 `claude-fable-5-2` 監査 |
-| **`multi-agent-opinion` Stage 2** | 内蔵サブエージェント **`mindfulness-inspector`** が指摘を `file:line` 照合し `CONFIRMED / UNVERIFIED / REJECTED` に分類 | Human 明示指示時のみ `sonnet_inspect.py --human-authorized`（`--bare` + 商用 API キー必須）で外部 `claude-fable-5-2` 再検査 |
+| **`multi-agent-opinion`（Lane 1 / Lane 2 Swarm）** | **Lane 1**: `invoke_subagent` で専門役（`flash`）＋ **`mindfulness-inspector`**（`inherit`）<br>**Lane 2 (§4)**: 節目・異種ベンダー監査時は `swarm(action="models")` で最新 Fast / Frontier / Claude Opus を動的指名して2フェーズ独立査読 | Human 明示指示時のみ `sonnet_inspect.py --human-authorized`（`--bare` + 商用 API キー必須）で外部 `claude-fable-5-2` 再検査 |
 | **ブラウザ確認・画面撮影** | Antigravity 標準内蔵の **`browser` サブエージェント** または Playwright ヘッドレス実行（`cdp-relay` 導入環境では拡張中継も利用可） | ※デッドロックする `chrome_devtools` 直結は常時ブロック |
 
 詳細は [docs/CUSTOMIZATION_GUIDE.md](./docs/CUSTOMIZATION_GUIDE.md) をご覧ください。

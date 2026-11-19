@@ -11,7 +11,7 @@ description: Exhaustive fact observation on failure.
 
 - GEMINI.md §0.2: 同一の作業文脈で3回の失敗（3ストライク）、または「照合: 予測と異なる」・前提不一致（§0.3 の、指示や文書の前提と観測事実の食い違い）が発生し、現在の視座が低いことが疑われるとき
 - ユーザーが明示的にマインドフルネス観察を依頼したとき
-- **再発火の上限**: 同一の作業文脈につき1回まで。観察後に視座を引き上げても同じ壁にはじかれ続け3ストライクに達した場合は、`multi-agent-opinion` スキル（起動モードB: 発想転換）または標準の `ask-opus` スキル（Antigravity 内蔵 Opus 5.5 High）へ進む
+- **再発火の上限**: 同一の作業文脈につき1回まで。観察後に視座を引き上げても同じ壁にはじかれ続け3ストライクに達した場合は、`multi-agent-opinion` スキル（起動モードB: 発想転換）または標準の `ask-opus` スキル（Antigravity 内蔵の最新 Claude Opus High 動的選択）へ進む
 
 ## 2. multi-agent-opinion モードBとの使い分け
 

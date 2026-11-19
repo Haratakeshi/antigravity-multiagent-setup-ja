@@ -1018,6 +1018,271 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
             if run_cproc("proc-cli-unavailable-fallback").get("decision") != "continue":
                 errors.append("[HOOK_TEST_FAIL] process-review-gate CLI exit=2 fallback expected continue")
 
+            # 15g. Swarm dynamic model audit panel recognition (v1.5.2):
+            #      (1) read-only `workspace: "inherit"` audit name + DONE -> allow
+            #      (2) advisory name (`opus-advisor`) -> continue
+            #      (3) non-inherit workspace (`share`) -> continue
+            #      (4) failed/errored swarm dispatch (`status: "ERROR"`) -> continue
+            c_app.write_text(base_app.replace("foo();", "foo(3);"), encoding="utf-8")
+            c_sub.write_text("export const sub = 3;\n", encoding="utf-8")
+            edit_two_files_step = json.dumps({
+                "type": "PLANNER_RESPONSE",
+                "tool_calls": [
+                    {
+                        "name": "edit_file",
+                        "args": {
+                            "Path": json.dumps(str(c_app)),
+                            "Target": json.dumps("foo(2);"),
+                            "Replacement": json.dumps("foo(3);"),
+                        },
+                    },
+                    {
+                        "name": "edit_file",
+                        "args": {
+                            "Path": json.dumps(str(c_sub)),
+                            "Target": json.dumps("export const sub = 2;"),
+                            "Replacement": json.dumps("export const sub = 3;"),
+                        },
+                    },
+                ],
+            })
+
+            # 15g-1: Valid read-only Swarm audit panel -> allow
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm audit valid"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{
+                            "name": "swarm",
+                            "args": {
+                                "action": json.dumps("add"),
+                                "name": json.dumps("review-logic"),
+                                "model": json.dumps("gemini-4-hydrogen-high"),
+                                "workspace": json.dumps("inherit"),
+                                "brief": json.dumps("Read-only audit of src/app.ts and src/sub.ts"),
+                            },
+                        }],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "Added member review-logic"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-audit-allow").get("decision") != "allow":
+                errors.append("[HOOK_TEST_FAIL] 15g-1 read-only Swarm audit panel expected allow")
+
+            # 15g-2: Advisory Swarm worker (`opus-advisor`) must NOT count as audit -> continue
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm advisor only"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{
+                            "name": "swarm",
+                            "args": {
+                                "action": json.dumps("add"),
+                                "name": json.dumps("opus-advisor"),
+                                "model": json.dumps("claude-opus-5-5-high"),
+                                "workspace": json.dumps("inherit"),
+                                "brief": json.dumps("Architecture advice"),
+                            },
+                        }],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "Added member opus-advisor"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-advisor-continue").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-2 advisory opus-advisor expected continue")
+
+            # 15g-3: Non-inherit workspace (`share`) Swarm worker must NOT count as audit -> continue
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm share workspace"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{
+                            "name": "swarm",
+                            "args": {
+                                "action": json.dumps("add"),
+                                "name": json.dumps("review-logic"),
+                                "workspace": json.dumps("share"),
+                                "brief": json.dumps("Work in shared copy"),
+                            },
+                        }],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "Added member review-logic"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-share-continue").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-3 Swarm workspace=share expected continue")
+
+            # 15g-4: Failed Swarm audit dispatch (`status: ERROR`) must NOT count as audit -> continue
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm error dispatch"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{
+                            "name": "swarm",
+                            "args": {
+                                "action": json.dumps("add"),
+                                "name": json.dumps("review-logic"),
+                                "workspace": json.dumps("inherit"),
+                                "brief": json.dumps("Audit"),
+                            },
+                        }],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "ERROR", "error": "quota exhausted", "content": "error"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-error-continue").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-4 failed Swarm audit dispatch expected continue")
+
+            # 15g-5: Parallel multi-tool batch misalignment defense:
+            #        (a) [read_file -> VIEW_FILE(DONE), swarm(review-logic -> ERROR), swarm(opus-advisor -> DONE)] -> continue
+            #        (b) Omitted non-GENERIC result (3 tool_calls, 2 GENERIC steps) -> Fail-Closed -> continue
+            for sub_cid, results_steps in [
+                (
+                    "proc-swarm-batch-err",
+                    [
+                        json.dumps({"type": "VIEW_FILE", "status": "DONE", "content": "ok"}),
+                        json.dumps({"type": "GENERIC", "status": "ERROR", "error": "failed"}),
+                        json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                    ],
+                ),
+                (
+                    "proc-swarm-batch-mismatch",
+                    [
+                        json.dumps({"type": "GENERIC", "status": "ERROR", "error": "failed"}),
+                        json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                    ],
+                ),
+            ]:
+                ptp.write_text(
+                    "\n".join([
+                        json.dumps({"type": "USER_INPUT", "content": sub_cid}),
+                        edit_two_files_step,
+                        json.dumps({
+                            "type": "PLANNER_RESPONSE",
+                            "tool_calls": [
+                                {"name": "read_file", "args": {"Path": json.dumps(str(c_app))}},
+                                {
+                                    "name": "swarm",
+                                    "args": {
+                                        "action": json.dumps("add"),
+                                        "name": json.dumps("review-logic"),
+                                        "workspace": json.dumps("inherit"),
+                                    },
+                                },
+                                {
+                                    "name": "swarm",
+                                    "args": {
+                                        "action": json.dumps("add"),
+                                        "name": json.dumps("opus-advisor"),
+                                        "workspace": json.dumps("inherit"),
+                                    },
+                                },
+                            ],
+                        }),
+                        *results_steps,
+                    ]) + "\n",
+                    encoding="utf-8",
+                )
+                if run_cproc(sub_cid).get("decision") != "continue":
+                    errors.append(f"[HOOK_TEST_FAIL] 15g-5 {sub_cid} expected continue")
+
+            # 15g-6: Valid audit alongside failing advisory call in same batch -> allow (no false rejection)
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm batch valid audit"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [
+                            {"name": "read_file", "args": {"Path": json.dumps(str(c_app))}},
+                            {
+                                "name": "swarm",
+                                "args": {
+                                    "action": json.dumps("add"),
+                                    "name": json.dumps("review-logic"),
+                                    "workspace": json.dumps("inherit"),
+                                },
+                            },
+                            {
+                                "name": "swarm",
+                                "args": {
+                                    "action": json.dumps("add"),
+                                    "name": json.dumps("opus-advisor"),
+                                    "workspace": json.dumps("inherit"),
+                                },
+                            },
+                        ],
+                    }),
+                    json.dumps({"type": "VIEW_FILE", "status": "DONE", "content": "ok"}),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                    json.dumps({"type": "GENERIC", "status": "ERROR", "error": "quota"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-batch-valid-allow").get("decision") != "allow":
+                errors.append("[HOOK_TEST_FAIL] 15g-6 valid Swarm audit in parallel batch expected allow")
+
+            # 15g-7: Mutating composite role names (`review-author`, `audit-implementer`) & non-string workspace -> continue
+            for bad_idx, bad_args in enumerate([
+                {"action": json.dumps("add"), "name": json.dumps("review-author"), "workspace": json.dumps("inherit")},
+                {"action": json.dumps("add"), "name": json.dumps("audit-implementer"), "workspace": json.dumps("inherit")},
+                {"action": json.dumps("add"), "name": json.dumps("review-logic"), "workspace": ["inherit"]},
+            ]):
+                ptp.write_text(
+                    "\n".join([
+                        json.dumps({"type": "USER_INPUT", "content": f"swarm bad role {bad_idx}"}),
+                        edit_two_files_step,
+                        json.dumps({
+                            "type": "PLANNER_RESPONSE",
+                            "tool_calls": [{"name": "swarm", "args": bad_args}],
+                        }),
+                        json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                    ]) + "\n",
+                    encoding="utf-8",
+                )
+                if run_cproc(f"proc-swarm-bad-role-{bad_idx}").get("decision") != "continue":
+                    errors.append(f"[HOOK_TEST_FAIL] 15g-7 case {bad_idx} expected continue")
+
+            # 15g-8: Out-of-order GENERIC steps matched accurately by tool_call_id -> ERROR stays blocked
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "swarm callId match"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [
+                            {
+                                "id": "call_rev",
+                                "name": "swarm",
+                                "args": {"action": json.dumps("add"), "name": json.dumps("review-logic"), "workspace": json.dumps("inherit")},
+                            },
+                            {
+                                "id": "call_adv",
+                                "name": "swarm",
+                                "args": {"action": json.dumps("add"), "name": json.dumps("opus-advisor"), "workspace": json.dumps("inherit")},
+                            },
+                        ],
+                    }),
+                    json.dumps({"type": "GENERIC", "tool_call_id": "call_adv", "status": "DONE", "content": "ok"}),
+                    json.dumps({"type": "GENERIC", "tool_call_id": "call_rev", "status": "ERROR", "error": "failed"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-swarm-callid-err").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-8 out-of-order callId error expected continue")
+
 
 def run_check() -> int:
     errors: list[str] = []

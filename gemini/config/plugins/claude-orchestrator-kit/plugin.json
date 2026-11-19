@@ -1,15 +1,15 @@
 {
   "name": "claude-orchestrator-kit",
-  "displayName": "Model-Adaptive Orchestrator Kit (Carbon 高速化 / 内蔵 Opus 軍師 / Flash)",
-  "version": "1.5.2",
-  "description": "選択中のメインモデル (Gemini 4 Carbon / Argon / Flash / 内蔵 Claude) に応じて損益分岐点ベースの役割分担と並列バッチ規律を適用するオーケストレーターキット。標準のセカンドオピニオンは Antigravity 内蔵 Claude Opus 5.5 (High) (`ask-opus`) で規約完全準拠・追加課金ゼロで実行し、Human 明示指示かつ商用 API キー設定時のみ外部 Claude Fable 5.2 (`ask-fable`) を `--bare` モードで呼び出します。",
+  "displayName": "Model-Adaptive Orchestrator Kit (Gemini 4 Neon/Carbon/Hydrogen 適応 / 内蔵 Opus 軍師)",
+  "version": "1.6.0",
+  "description": "選択中のメインモデル (Gemini 4 Neon / Carbon / Argon / Hydrogen / Flash / 内蔵 Claude) に応じて損益分岐点ベースの役割分担と並列バッチ規律を適用するオーケストレーターキット。標準のセカンドオピニオンは Antigravity 内蔵の最新 Claude Opus (High) を `swarm(action=\"models\")` で動的選択する `ask-opus` で規約完全準拠・追加課金ゼロで実行し、Human 明示指示かつ商用 API キー設定時のみ外部 Claude Fable 5.2 (`ask-fable`) を `--bare` モードで呼び出します。",
   "author": {
     "name": "Haratakeshi",
     "url": "https://github.com/Haratakeshi"
   },
   "repository": "https://github.com/Haratakeshi/antigravity-multiagent-setup-ja",
   "suggestedPrompts": [
-    "ask-opus スキル（Antigravity 内蔵 Opus 5.5 High）で現在の設計トレードオフにセカンドオピニオンをもらって",
+    "ask-opus スキル（Antigravity 内蔵最新 Claude Opus High 動的選択）で現在の設計トレードオフにセカンドオピニオンをもらって",
     "flash-investigator を並列起動してフロントエンドとバックエンドの実装を同時に調査して",
     "carbon-verifier で現在の差分と受け入れ基準の高速バッチ・クリーンルーム反証レビューを実行して"
   ]

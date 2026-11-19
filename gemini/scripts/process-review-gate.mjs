@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Antigravity Smart Process Review Gate (Stop Hook — v1.5.1)
+ * Antigravity Smart Process Review Gate (Stop Hook — v1.5.2)
  *
  * Enforces §3.5 Smart Exit Gate without sacrificing Tier 0 speed:
  * 1. Instant allow (<5ms) on non-stop events, `fullyIdle === false`, `AGY_SKIP_PROCESS_REVIEW_GATE=1`,
  *    subagent transcripts (`lastUserIdx < 0`, regardless of `CHECKPOINT`), Q&A/read-only turns,
  *    or `pending_human_review` / `status: unverified` escalations (restoring truncated steps from `transcript_full.jsonl`).
  * 2. Evaluates ONLY the unreviewed delta after the last genuine audit dispatch in the current turn
- *    (excluding advisory-only `senior-architect-advisor` and `--check` probes, and preserving any
- *    same-step parallel mutations so `[invoke implementer, invoke auditor]` never skips review).
+ *    (supporting both `invoke_subagent` and read-only `workspace: "inherit"` Swarm audit panels,
+ *    excluding advisory-only `senior-architect-advisor` / `opus-advisor` and `--check` probes, and preserving
+ *    any same-step parallel mutations so `[invoke implementer, invoke auditor]` never skips review).
  * 3. Works both with an active workspace (`workspacePaths[0]`) and in cross-root / workspace-less
  *    Orchestrator sessions (including Unicode/Japanese paths) by resolving per-file and per-prompt git roots,
  *    AND catches changes committed within the same unreviewed window (`git commit` before stop).
@@ -85,6 +86,11 @@ const AUDIT_SUBAGENTS = new Set([
   'web-production-readiness-reviewer',
   'stripe-billing-readiness-reviewer',
 ]);
+
+const SWARM_AUDIT_NAME_RE =
+  /(?:^|[-_])(review|reviewer|audit|auditor|verify|verifier|refute|refuter|inspector|critic|panel)(?:[-_0-9]|$)/i;
+const SWARM_NON_AUDIT_NAME_RE =
+  /(?:^|[-_])(advisor|monitor|narrator|author|implementer|editor|writer|fixer|coder|builder|developer)(?:[-_0-9]|$)/i;
 
 const ESCALATION_MARKERS = ['pending_human_review', 'status: unverified'];
 
@@ -602,6 +608,20 @@ function isCliAuditInvocation(cmd) {
   return runsExitReview || runsSonnetInspect;
 }
 
+function isSwarmAuditInvocation(args) {
+  if (!args || typeof args !== 'object') return false;
+  if (unwrapArg(args.action).toLowerCase() !== 'add') return false;
+  if (args.workspace !== undefined && args.workspace !== null && typeof args.workspace !== 'string') {
+    return false;
+  }
+  const ws = unwrapArg(args.workspace).toLowerCase();
+  if (ws && ws !== 'inherit') return false;
+  const name = unwrapArg(args.name);
+  if (!name) return false;
+  if (SWARM_NON_AUDIT_NAME_RE.test(name)) return false;
+  return SWARM_AUDIT_NAME_RE.test(name);
+}
+
 function isAuditToolCall(tc, auditIds) {
   if (!tc || typeof tc !== 'object') return false;
   const nm = String(tc.name || tc.toolName || '');
@@ -610,6 +630,9 @@ function isAuditToolCall(tc, auditIds) {
     return true;
   }
   if (nm === 'send_message' && auditIds.has(unwrapArg(args.Recipient))) {
+    return true;
+  }
+  if (nm === 'swarm' && isSwarmAuditInvocation(args)) {
     return true;
   }
   if (nm === 'run_command' && isCliAuditInvocation(unwrapArg(args.CommandLine))) {
@@ -640,13 +663,52 @@ function stepResultIndicatesCliUnavailable(turnSteps, stepIdx) {
   return false;
 }
 
+function toolCallResultIndicatesError(turnSteps, stepIdx, callIdx, tc) {
+  const stepResults = [];
+  for (let k = stepIdx + 1; k < turnSteps.length; k++) {
+    const nxt = turnSteps[k];
+    if (!nxt || nxt.type === 'PLANNER_RESPONSE' || nxt.type === 'USER_INPUT') break;
+    if (nxt.type === 'SYSTEM_MESSAGE' || nxt.type === 'CHECKPOINT') continue;
+    stepResults.push(nxt);
+  }
+  if (stepResults.length === 0) return false;
+
+  const hasErr = (r) =>
+    r.status === 'ERROR' ||
+    r.status === 'INVALID' ||
+    (typeof r.error === 'string' && r.error.trim().length > 0);
+
+  const tcCallId = String((tc && (tc.id || tc.toolCallId || tc.tool_call_id)) || '');
+  if (tcCallId) {
+    const matched = stepResults.find(
+      (r) => String(r.tool_call_id || r.toolCallId || r.id || '') === tcCallId,
+    );
+    if (matched) return hasErr(matched);
+    if (stepResults.some((r) => Boolean(r.tool_call_id || r.toolCallId || r.id))) {
+      return true;
+    }
+  }
+
+  const totalCalls = Array.isArray(turnSteps[stepIdx]?.tool_calls) ? turnSteps[stepIdx].tool_calls.length : 0;
+  if (totalCalls > 0 && stepResults.length === totalCalls && callIdx < stepResults.length) {
+    return hasErr(stepResults[callIdx]);
+  }
+
+  // Fail-Closed when result steps cannot be unambiguously aligned to tool_calls
+  return true;
+}
+
 function stepDispatchesAudit(turnSteps, stepIdx, auditIds) {
   const st = turnSteps[stepIdx];
   if (!st || !Array.isArray(st.tool_calls)) return false;
-  for (const tc of st.tool_calls) {
+  for (let callIdx = 0; callIdx < st.tool_calls.length; callIdx++) {
+    const tc = st.tool_calls[callIdx];
     if (!isAuditToolCall(tc, auditIds)) continue;
     const nm = String(tc.name || tc.toolName || '');
     if (nm === 'run_command' && stepResultIndicatesCliUnavailable(turnSteps, stepIdx)) {
+      continue;
+    }
+    if (nm === 'swarm' && toolCallResultIndicatesError(turnSteps, stepIdx, callIdx, tc)) {
       continue;
     }
     return true;

@@ -1,13 +1,13 @@
 ---
 name: ask-fable
-description: 【Human明示指示＋商用APIキー限定】人間がチャットで明示的に「ask-fable（外部 Claude Fable 5.2 API）」の使用を指示した最重要タスクに限り、`ANTHROPIC_API_KEY`（商用従量課金・`--bare` モード）経由で `claude-fable-5-2` に読取専用相談を行うスキル。通常運用・3ストライク時は自動実行せず必ず標準の `ask-opus`（Antigravity内蔵 Opus 5.5 High）を使用すること。
+description: 【Human明示指示＋商用APIキー限定】人間がチャットで明示的に「ask-fable（外部 Claude Fable 5.2 API）」の使用を指示した最重要タスクに限り、`ANTHROPIC_API_KEY`（商用従量課金・`--bare` モード）経由で `claude-fable-5-2` に読取専用相談を行うスキル。通常運用・3ストライク時は自動実行せず必ず標準の `ask-opus`（Antigravity内蔵最新 Claude Opus High）を使用すること。
 ---
 
 # ask-fable: 外部 Claude Fable 5.2 API 召喚スキル（Human明示指示 ＆ 商用APIキー厳格限定）
 
 > [!IMPORTANT]
 > **利用規約（ToS）および課金保護のための絶対ルール**
-> 1. **エージェントの自律判断による自動起動は厳禁**: 3ストライク時や通常の設計相談では本スキルを呼ばず、必ず標準の **`ask-opus`（Antigravity 内蔵 `Claude Opus 5.5 (High)`）** を使用してください。本スキルは **人間（Human）がプロンプトで明示的に `ask-fable` / 外部 Fable 5.2 の使用を指示したときのみ** 実行できます。
+> 1. **エージェントの自律判断による自動起動は厳禁**: 3ストライク時や通常の設計相談では本スキルを呼ばず、必ず標準の **`ask-opus`（Antigravity 内蔵の最新 Claude Opus (High)）** を使用してください。本スキルは **人間（Human）がプロンプトで明示的に `ask-fable` / 外部 Fable 5.2 の使用を指示したときのみ** 実行できます。
 > 2. **個人サブスクリプション OAuth（`claude.ai` Free/Pro/Max/Ultra）の完全遮断**: Anthropic Consumer Terms of Service（外部エージェントからの自動化アクセス禁止）を遵守するため、`ask_fable.py` は **商用の `ANTHROPIC_API_KEY`**（環境変数または `~/.gemini/.env` 内の設定）または商用クラウド認証（Bedrock / Vertex AI / Foundry）が存在しない限り **機械的にブロック（`exit 2`）** します。また実行時は公式 `--bare` モードを強制し、Keychain や `claude.ai` OAuth トークンを一切読み取りません。
 > 3. **データ学習設定の確認**: 外部 Claude API の出力を Antigravity に取り込む際は、競合モデル学習禁止条項への配慮として Antigravity 側のデータ学習利用オプトアウト設定を推奨します。
 
@@ -52,4 +52,4 @@ python3 ~/.gemini/config/plugins/claude-orchestrator-kit/skills/ask-fable/script
 
 ## 3. 終了コード `2` 時のフォールバック（`ask-opus` への切替）
 
-`ANTHROPIC_API_KEY` が未設定等で終了コード `2`（`[FALLBACK_TO_NATIVE_SUBAGENT]`）が返った場合は、Consumer OAuth で無理に実行しようとせず、ユーザーに「商用 `ANTHROPIC_API_KEY` 未設定のため外部 API 呼び出しはスキップし、Antigravity 内蔵 `Claude Opus 5.5 (High)`（`ask-opus`）で代替する」旨を伝えて **`ask-opus` スキル** を実行してください。
+`ANTHROPIC_API_KEY` が未設定等で終了コード `2`（`[FALLBACK_TO_NATIVE_SUBAGENT]`）が返った場合は、Consumer OAuth で無理に実行しようとせず、ユーザーに「商用 `ANTHROPIC_API_KEY` 未設定のため外部 API 呼び出しはスキップし、Antigravity 内蔵の最新 Claude Opus (High)（`ask-opus`）で代替する」旨を伝えて **`ask-opus` スキル** を実行してください。
