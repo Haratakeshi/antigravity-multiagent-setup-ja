@@ -8,8 +8,8 @@
 
 本セットアップは **外部 CLI や API キーが一切なくても、Antigravity 内蔵モデルだけで 100% 動作** し、かつ Anthropic / Google 双方の利用規約（ToS）を厳格に遵守する2段構成を採っています。
 
-### ① 日常・標準運用: `ask-opus` ＆ 2レーン複眼監査（100% Antigravity 内蔵・モデル世代自動追従）
-- メインモデルが `Gemini 4 Neon` / `Carbon` 等の場合でも、`ask-opus` スキルは毎回 **`swarm(action="models", all=True)` からその時点の最新内蔵 `Claude Opus (High)`（例: `claude-opus-5-5-high`）を動的選択** して独立クリーンコンテキスト召喚し、別ベンダー目線のセカンドオピニオンを取得します（メインが既に内蔵 Opus の Mode C では `senior-architect-advisor` を起動）。
+### ① 日常・標準運用: `planning-advisor` / `ask-opus` ＆ 2レーン複眼監査（100% Antigravity 内蔵・モデル世代自動追従）
+- メインモデルが `Gemini 4 Neon` / `Carbon` 等の場合でも、計画着手前の **`planning-advisor`** スキル（Single Opus High / Carbon High / Dual High 並列）および実装中の **`ask-opus`** スキルは毎回 **`swarm(action="models", all=True)` からその時点の最新内蔵 `Claude Opus (High)` / `Gemini 4 Carbon (High)` を動的選択** して独立クリーンコンテキスト召喚し、別ベンダー目線・長考視点の助言を取得します（メインが既に内蔵 Opus の Mode C では `planning-advisor` / `senior-architect-advisor` を起動）。
 - 出口反証ゲート（Tier 1）は内蔵 `second-opinion-lite` / `carbon-verifier`、日常 Tier 2 と Stage 2 事実再検査は `invoke_subagent`（**Lane 1**: 最新版 Antigravity で `flash` → `Hydrogen High` へ自動追従）が標準で動作します。
 - 節目の大型設計や異種ベンダー（Gemini × Claude）複眼レビューでは `multi-agent-opinion` §4 の **Swarm 動的モデル解決パネル（Lane 2）** を起動でき、固定世代 ID なしで常に最新 Fast / Frontier / Claude モデルへ理念（`agents/*.md` SSOT）を渡せます。
 

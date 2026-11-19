@@ -46,6 +46,6 @@ description: Structured 9-step requirement alignment, multi-axis investigation, 
    - 反証レビューを経た正確な調査結果をもとに、**具体的な実装 TODO リスト（アクションアイテム）に落とし込むための詳細仕様（数値、文言、境界値・エッジケースの挙動、優先順位など）** を質問する。
    - ここでも「1項目 1 Ask（複数セクションを1つにまとめない）」と「推奨回答 `(Recommended)` の先頭配置」を厳守する。
 8. **Step 8: Ask 結果を元にした反証レビュー ＆ Plan 策定（Plan Refutation Review & Planning）**
-   - Step 7 の回答をすべて反映した実装計画（Plan / TODO リスト）を作成し、ゴール・基本方針・詳細指定・コードベース不変条件に矛盾や抜け漏れがないか **反証レビュー** を実施して最終 Plan を確定する。
+   - Step 7 の回答をすべて反映した実装計画（Plan / TODO リスト）を作成し、ゴール・基本方針・詳細指定・コードベース不変条件に矛盾や抜け漏れがないか **反証レビュー**（複数モジュール横断・不可逆改修時は Antigravity の `planning-advisor` や Claude Code の `/advisor` 等での事前助言も含む）を実施して最終 Plan を確定する。
 9. **Step 9: 実装開始（Start Implementation）**
    - 反証レビュー済みの確定 Plan に基づき実装を開始する（※ユーザーから「プラン確定後にGOを出してから実装」と指定されている場合は承認を待ち、自走指定の場合は直ちに実装へ進む）。

@@ -37,7 +37,7 @@ description: Risk-scaled multi-agent clean-room review pipeline (Tier 0-3, 3-str
 |---|---|---|---|
 | **A: 成果物レビュー** | コミット/PR前・重要実装後 | 機密マスク済み Git 差分/対象コード ＋ 不変条件仕様（Invariants Spec / docs / API契約）。※作成側の思考経緯・言い訳は厳禁 | `[CATEGORY] [LEVEL] [file:line](url) - 内容 + 修正案` |
 | **B: 発想転換（3ストライク）** | `GEMINI.md §0.2` 3連続失敗時 | 達成したいゴール ＋ 対象コードパスのみ（失敗ログ・仮説は遮断） | `[CATEGORY] [DIRECTION: 方針名] 内容 + 根拠` |
-| **C: 設計ドラフト反証** | 実装前の設計・UX・構成計画 | 提案ドラフト ＋ 解決すべき症状 ＋ 現行コード/SSOT仕様パス | `[CATEGORY] [VERDICT: REFUTED/SURVIVED/GAP] [file:line](url) - 反証と最小代替案` |
+| **C: 設計ドラフト反証** | 実装前の設計・UX・構成計画 | 提案ドラフト ＋ 解決すべき症状 ＋ 現行コード/SSOT仕様パス（※横断設計の事前助言は `planning-advisor` / `agents/planning-advisor.md` も併用可） | `[CATEGORY] [VERDICT: REFUTED/SURVIVED/GAP] [file:line](url) - 反証と最小代替案` |
 
 ---
 
@@ -105,7 +105,7 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
 1. 起動直前に **`swarm(action="models", all=True)`** を1回呼び出し、その時点で利用可能な最新モデル一覧と `quota_remaining` を取得します（※Gemini 群と Claude / GPT-OSS 群は別クォータ枠で計算されるため、異種ベンダー併用は精度向上とクォータ分散の両方に効きます）。
 2. 一覧と残クォータから、次の **能力ポリシー** に従って実行モデルを動的決定します（対象モデルが `0%` の場合はフォールバック順へ切替）：
    - **高速広域スキャン枠（Fast Tier）**: 一覧中の最新 Gemini 高速実行系 `high`（例: `gemini-4-hydrogen-high`、残 `0%` 時は同 `medium` または次点の最新高速系）
-   - **同系最上位・深掘り枠（Frontier Tier）**: 一覧中の最新 Gemini 上位系の標準/高推論（例: `gemini-4-neon-high`、極限のセキュリティ・長距離検証時は `gemini-4-carbon-medium` / `high`。単純タスクでの overthinking を避けるため `xhigh` は明示要求時のみ）
+   - **同系最上位・深掘り枠（Frontier Tier）**: 一覧中の最新 Gemini 上位系の標準/高推論（例: `gemini-4-neon-high`、重い設計相談や極限のセキュリティ・長距離検証時は v2.33.0+ の長考タイムアウト解消により **`gemini-4-carbon-high`** / `medium` も安定利用可。単純タスクでの overthinking を避けるため `xhigh` は明示要求時のみ）
    - **異種ベンダー反証枠（Cross-Vendor Tier）**: 一覧中の最新内蔵 `claude-opus-*-high`（例: `claude-opus-5-5-high`、残 `0%` 時は最新 `claude-opus-*-medium` → 最新 `claude-sonnet-*-high`）
 
 ### Step 2: Phase 1 — 独立並列査読（同調バイアス防止・1ターン同時 `add`）
@@ -121,3 +121,10 @@ Tier 2 では以下のカタログから **必須コア（2体）＋ 変更領�
 1. 起床後、`read_board(since=0)` で全ワーカーの独立所見を取得します。
 2. Gemini 枠と Claude 枠などで `CRITICAL` / `MAJOR` の判定が割れた指摘がある場合のみ、該当投稿番号（`#seq`）を指してピンポイントにボード上でクロス反証させます（例: `@opus-refuter #4 の指摘を実コード file:line で反証検証して`）。
 3. 最終的にメイン（または `mindfulness-inspector`）が全指摘を実コード・一次仕様と照合して `CONFIRMED / UNVERIFIED / REJECTED` を確定し、役割を終えた監査ワーカーを **`swarm(action="kill", name="...")`** でクリーン終了します。
+
+### 4.1 計画時点の横断設計 Advisor プリセット（`planning-advisor` 連携）
+実装着手前（計画確定前）に `Orchestrator (Neon)` 等の主担当から横断設計の助言（境界・SSOT・不可逆地雷・簡潔な代替案）を得たい場合は、スキル **`planning-advisor`** の手順で `agents/planning-advisor.md` を理念 SSOT として起動します:
+- **Single Opus High**（日常の横断設計・異種ベンダー視点）: `name: "plan-opus-advisor"`, `model`: 最新 `claude-opus-*-high`
+- **Single Carbon High**（大規模コードベースの構造深掘り）: `name: "plan-carbon-advisor"`, `model`: 最新 `gemini-4-carbon-high`
+- **Dual High**（大型横断改修・不可逆変更）: `plan-opus-advisor` ＋ `plan-carbon-advisor` を 1 ターン並列 `swarm(action="add")` し、見解対立時のみ `#seq` で 1 回突合したのち `kill`。
+- **ゲート境界注意**: `plan-*-advisor` は事前助言専用であり、**実装後の Tier 1+ 出口監査（`review-*` / `audit-*` / `opus-refuter` 等）を代替しません**（`process-review-gate.mjs` も非バイパス）。

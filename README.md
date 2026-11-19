@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![PRs: Not Accepted (Fork Friendly)](https://img.shields.io/badge/PRs-Not%20Accepted%20(Fork%20Friendly)-orange.svg)](./CONTRIBUTING.md)
-[![Antigravity: v2.32+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Neon%20%2F%20Carbon%20v1.6-4285F4.svg)](#-v16-アップデート-理念ssot--swarm動的モデル解決2レーン設計--gemini-4-neon--hydrogen-対応)
+[![Antigravity: v2.33+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Neon%20%2F%20Carbon%20v1.7-4285F4.svg)](#-v17--v16-アップデート-計画時点-planning-advisor-理念ssot--swarm動的モデル解決)
 
 Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（2レーン・3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Neon / Carbon / Hydrogen / 最新内蔵 Claude Opus (High) のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
 
@@ -12,16 +12,19 @@ Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・�
 
 ---
 
-## 🆕 v1.6 アップデート: 理念SSOT × Swarm動的モデル解決（2レーン設計） ＆ Gemini 4 Neon / Hydrogen 対応
+## 🆕 v1.7 / v1.6 アップデート: 計画時点 `planning-advisor` ＆ 理念SSOT × Swarm動的モデル解決（2レーン設計）
 
-モデルの世代交代（`Gemini 4 Neon`・`Gemini 4 Hydrogen` 等）に左右されず、常に最新・異種ベンダーの頭脳でクリーンルーム監査を行えるよう、**「理念正本（`agents/*.md` SSOT）とモデル選定の分離」** を実施しました（v1.5 のスマート出口反証ゲート・Zero-Tax 3層防衛・ToS ガード・高速パスもすべて包含）：
+Claude Code の **Advisor Strategy** を Antigravity へ統合し、さらにモデルの世代交代（`Gemini 4 Neon`・`Gemini 4 Hydrogen` 等）に左右されず最新・異種ベンダーの頭脳で事前相談・事後監査を行えるよう、**「理念正本（`agents/*.md` SSOT）とモデル選定の分離」** を実施しました（v1.5 のスマート出口反証ゲート・Zero-Tax 3層防衛・ToS ガード・高速パスもすべて包含）：
 
-1. **2レーンハイブリッド複眼監査（`multi-agent-opinion` v1.6 ＋ `process-review-gate.mjs` v1.5.2）**:
+1. **計画時点の横断設計アドバイザー（`planning-advisor` — v1.7 NEW）**:
+   - Antigravity App v2.33.0 / CLI v1.5.10+ での長時間推論タイムアウト解消を活かし、主担当（`Orchestrator (Neon)` 等）が実装へ踏み切る前に **`planning-advisor`** スキル（SSOT: `multi-agent-kit/agents/planning-advisor.md`）を起動。
+   - **Single Opus High** / **Single Carbon High** / **Dual High（`Opus High × Carbon High` 並列召喚）** の 3 プリセットを `swarm(action="models")` で動的解決し、責務境界・SSOT 整合・不可逆地雷・簡潔な代替構造の短尺戦略助言を取得します（`plan-*-advisor` は事前助言専用で、`process-review-gate.mjs` をバイパスしません）。
+2. **2レーンハイブリッド複眼監査（`multi-agent-opinion` ＋ `process-review-gate.mjs` v1.5.2）**:
    - **Lane 1（通常・高速レーン・`invoke_subagent`）**: 日常の Tier 1（`second-opinion-lite` / `carbon-verifier`）および軽量 Tier 2 は、機械的 Read-Only・完全隔離・最速の `invoke_subagent`（`flash` ティア＝最新版 Antigravity では `Gemini 4 Hydrogen High` に自動追従）を維持。
    - **Lane 2（Swarm 動的モデル解決パネル・`swarm`）**: 節目の重要設計・大型アップデートの総合反証・最新モデル＋異種ベンダー（Gemini × Claude）複眼レビューでは、`swarm(action="models")` からその時点の最新 Fast / Frontier / Claude Opus High を動的解決し、`agents/*.md` の理念を注入して2フェーズ独立査読（`process-review-gate.mjs` v1.5.2 でも Read-Only `workspace: "inherit"` の Swarm 監査を正式認識）。
-2. **`ask-opus` の動的最新モデル追従 ＆ Gemini 4 Neon / Hydrogen 適応**:
+3. **`ask-opus` の動的最新モデル追従 ＆ Gemini 4 Neon / Hydrogen 適応**:
    - `ask-opus` は固定モデル ID をハードコードせず、`swarm(action="models")` からその時点の最新内蔵 `claude-opus-*-high`（例: `claude-opus-5-5-high`）を動的選択。`claude-orchestrator-kit` も `Gemini 4 Neon` / `Carbon` / `Hydrogen` 世代に対応済み。
-3. **スマート出口反証ゲート・Zero-Tax 3層 Anti-Hang・ToS 完全準拠ガード（v1.5 継続搭載）**:
+4. **スマート出口反証ゲート・Zero-Tax 3層 Anti-Hang・ToS 完全準拠ガード（v1.5 継続搭載）**:
    - **Tier 0 ⇔ Tier 1+ 境界**: 文書・設定・CSS・単一コード`25行未満`の微修正は 0秒素通し。`flash-implementer` 委譲後や `>= 2` ファイル / `>= 25` 行変更時は `process-review-gate.mjs` が機械的に反証監査を確認（`-U3` hunk 比較で空 `catch {}` も遮断）。
    - **Zero-Tax 3層 Anti-Hang**: `guard_commands.py` の無限待機コマンド事前 `deny` ＋ プロセス内ハード上限（§9.4）＋ 実測 `p90` 個別 ID 監視。
    - **ToS 完全準拠2段分離**: 日常相談・監査は 100% Antigravity 内蔵モデルで完結し、外部 `claude-fable-5-2` スクリプトは「Human 明示指示（`--human-authorized`）」＋「商用 `ANTHROPIC_API_KEY`」時のみ `--bare` モード（OAuth/Keychain 非読取）で動作。
@@ -115,9 +118,9 @@ flowchart TB
 | プラグイン名 | 役割・主な機能 | 同梱スキル / サブエージェント |
 |---|---|---|
 | **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview`） |
-| **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
+| **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ 計画前アドバイザー `planning-advisor` ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
 | **`multi-axis-investigation-kit`** | 1つの発見で探索を止めない直交多軸調査・内外両面観測・反証チェック | スキル: `multi-axis-investigation` |
-| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と内蔵 Opus 軍師・出口監査ゲート | スキル: `ask-opus`（標準・最新内蔵 Claude Opus High 動的選択）, `claude-exit-review`, `ask-fable`（Human明示＋商用API限定）<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
+| **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と内蔵 Opus/Carbon 計画助言・軍師・出口監査ゲート | スキル: `planning-advisor`（着手前の横断設計助言・Single/Dual High）, `ask-opus`（実装中の難所相談・最新内蔵 Claude Opus High 動的選択）, `claude-exit-review`, `ask-fable`（Human明示＋商用API限定）<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |
 
 ### 3. 日常ワークフロー単体スキル (`gemini/config/skills/` & `tools/`)
 
@@ -149,7 +152,7 @@ flowchart TB
 
 | 機能・スキル | 標準動作（デフォルト・追加課金ゼロ・規約100%クリーン） | Human 明示指示 ＋ 商用 `ANTHROPIC_API_KEY` 設定時のオプション動作 |
 |---|---|---|
-| **`ask-opus` / `ask-fable`**（軍師・設計相談） | **`ask-opus`**: `swarm(action="models")` でその時点の最新内蔵 **`Claude Opus (High)`**（例: `claude-opus-5-5-high`）を動的選択し単一クリーンルーム起動（Mode C 時は `senior-architect-advisor`） | **`ask-fable`**: Human が明示指示（`--human-authorized`）した重要タスクのみ、`--bare` モード（OAuth非読取）で外部 `claude-fable-5-2` API に読取専用相談 |
+| **`planning-advisor` / `ask-opus` / `ask-fable`**（事前計画助言 / 難所軍師） | **`planning-advisor`**（着手前）＆ **`ask-opus`**（実装中）: `swarm(action="models")` で最新内蔵 `Claude Opus (High)` / `Carbon (High)` を動的選択し単体または Dual 並列召喚（Mode C 時は内蔵サブエージェント使用） | **`ask-fable`**: Human が明示指示（`--human-authorized`）した重要タスクのみ、`--bare` モード（OAuth非読取）で外部 `claude-fable-5-2` API に読取専用相談 |
 | **`claude-exit-review`**（出口反証監査） | 内蔵サブエージェント **`carbon-verifier`**（または通常ロジックは `second-opinion-lite`）が差分＋画像を高速バッチ監査 | Human 明示指示時のみ `exit_review.py --human-authorized`（`--bare` + 商用 API キー必須）で外部 `claude-fable-5-2` 監査 |
 | **`multi-agent-opinion`（Lane 1 / Lane 2 Swarm）** | **Lane 1**: `invoke_subagent` で専門役（`flash`）＋ **`mindfulness-inspector`**（`inherit`）<br>**Lane 2 (§4)**: 節目・異種ベンダー監査時は `swarm(action="models")` で最新 Fast / Frontier / Claude Opus を動的指名して2フェーズ独立査読 | Human 明示指示時のみ `sonnet_inspect.py --human-authorized`（`--bare` + 商用 API キー必須）で外部 `claude-fable-5-2` 再検査 |
 | **ブラウザ確認・画面撮影** | Antigravity 標準内蔵の **`browser` サブエージェント** または Playwright ヘッドレス実行（`cdp-relay` 導入環境では拡張中継も利用可） | ※デッドロックする `chrome_devtools` 直結は常時ブロック |

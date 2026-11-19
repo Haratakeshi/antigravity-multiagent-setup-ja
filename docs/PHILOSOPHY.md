@@ -38,7 +38,7 @@ LLM エージェントに「丁寧に実装してください」「バグがな�
 
 ### ④ 脱中心化（Mindfulness）と 理念SSOT × 動的モデル解決の 2レーン監査 (`multi-agent-kit`)
 - **3ストライク時の脱中心化**: 3回連続で壁にはじかれたら、まず `mindfulness` スキルで評価語を一切禁じた純粋事実（Facts）だけを観察させ、選択的注意（思い込み）を解除します。それでも打開できなければ標準の `ask-opus`（`swarm(action="models")` で動的選択した最新内蔵 Claude Opus High による別ベンダー目線の軍師助言）または `multi-agent-opinion`（モードB）で別アプローチを導出します（Human 明示指示かつ商用 API キー設定時のみ外部 `ask-fable` も選択可）。
-- **理念 SSOT とモデル選定の分離（2レーン設計）**: 各専門レビュアーのプロンプト正本（`agents/*.md`）からモデル固有名を排し、日常の軽量監査（Tier 1 / 軽量 Tier 2）は機械的 Read-Only・完全隔離の **`invoke_subagent`（Lane 1）** で本体アップデートに自動追従させつつ、節目の重要設計や異種ベンダー複眼監査では **`swarm(action="models")` で実行時に最新モデルを解決して2フェーズ独立査読する Swarm パネル（Lane 2）** を併用します。
+- **理念 SSOT とモデル選定の分離（2レーン設計 ＆ Advisor Strategy）**: 各専門エージェントのプロンプト正本（`agents/*.md`）からモデル固有名を排し、計画着手前には主担当（`Neon` 等）の迷走・手戻りを防ぐ **`planning-advisor`**（`agents/planning-advisor.md` SSOT を用い `swarm` で最新 `Claude Opus High` / `Gemini 4 Carbon High` を単体または Dual 並列召喚して短尺の戦略助言を取得）、日常の軽量監査（Tier 1 / 軽量 Tier 2）には機械的 Read-Only・完全隔離の **`invoke_subagent`（Lane 1）**、節目の総合反証・異種ベンダー監査には **`swarm(action="models")` で2フェーズ独立査読する Swarm パネル（Lane 2）** を併用します。
 - **クリーンルーム原則 (§3.4)**: レビュアーには「作成者の苦労話や言い訳」を一切渡さず、純粋な **Git 差分 ＋ 不変条件仕様（Invariants Spec）** のみを渡します。
 - **リスク・速度比例の Tier 0〜3 スケーリング & 実装出口ゲート (§3.5)**:
   - **Tier 0（軽微変更のみ）**: 文書・設定・CSS微調整、または単一コード `25行未満` の微修正（実装委譲なし）のみメイン自身の差分・テスト確認（`§0.5` セルフレビュー）で即時完了し、サブエージェント起動待ちを発生させません。

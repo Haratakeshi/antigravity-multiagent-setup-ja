@@ -1283,6 +1283,62 @@ def run_hook_smoke_tests(errors: list[str], node_bin: str | None) -> None:
             if run_cproc("proc-swarm-callid-err").get("decision") != "continue":
                 errors.append("[HOOK_TEST_FAIL] 15g-8 out-of-order callId error expected continue")
 
+            # 15g-9: Planning advisors placed AFTER 2-file edits (Dual Swarm plan-opus-advisor + plan-carbon-advisor,
+            #        and invoke_subagent TypeName="planning-advisor" + send_message) must NEVER bypass exit audit -> continue
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "planning advisor swarm non-bypass"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [
+                            {
+                                "name": "swarm",
+                                "args": {
+                                    "action": json.dumps("add"),
+                                    "name": json.dumps("plan-opus-advisor"),
+                                    "workspace": json.dumps("inherit"),
+                                },
+                            },
+                            {
+                                "name": "swarm",
+                                "args": {
+                                    "action": json.dumps("add"),
+                                    "name": json.dumps("plan-carbon-advisor"),
+                                    "workspace": json.dumps("inherit"),
+                                },
+                            },
+                        ],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-plan-advisor-swarm").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-9 Dual plan-*-advisor Swarm expected continue (must not bypass audit)")
+
+            plan_adv_id = "11111111-2222-3333-4444-666666666666"
+            ptp.write_text(
+                "\n".join([
+                    json.dumps({"type": "USER_INPUT", "content": "planning advisor subagent non-bypass"}),
+                    edit_two_files_step,
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "invoke_subagent", "args": {"TypeName": json.dumps("planning-advisor")}}],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": json.dumps({"conversationId": plan_adv_id})}),
+                    json.dumps({
+                        "type": "PLANNER_RESPONSE",
+                        "tool_calls": [{"name": "send_message", "args": {"Recipient": json.dumps(plan_adv_id), "Message": json.dumps("follow-up")}}],
+                    }),
+                    json.dumps({"type": "GENERIC", "status": "DONE", "content": "ok"}),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            if run_cproc("proc-plan-advisor-subagent").get("decision") != "continue":
+                errors.append("[HOOK_TEST_FAIL] 15g-9 invoke_subagent(planning-advisor)+send_message expected continue (must not bypass audit)")
+
 
 def run_check() -> int:
     errors: list[str] = []
@@ -1389,6 +1445,10 @@ def run_check() -> int:
     ]
     if not (REPO_ROOT / "gemini/config/plugins/claude-orchestrator-kit/skills/ask-opus/SKILL.md").is_file():
         errors.append("[MISSING_SKILL] ask-opus/SKILL.md is missing")
+    if not (REPO_ROOT / "gemini/config/plugins/claude-orchestrator-kit/skills/planning-advisor/SKILL.md").is_file():
+        errors.append("[MISSING_SKILL] planning-advisor/SKILL.md is missing")
+    if not (REPO_ROOT / "gemini/config/plugins/multi-agent-kit/agents/planning-advisor.md").is_file():
+        errors.append("[MISSING_AGENT] planning-advisor.md SSOT is missing")
 
     with tempfile.TemporaryDirectory() as empty_home:
         # 6a. CLI absent -> exit=2 & [FALLBACK_TO_NATIVE_SUBAGENT]

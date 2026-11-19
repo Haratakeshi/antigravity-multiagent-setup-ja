@@ -79,8 +79,8 @@ flowchart TD
 
 ### Step 8: Ask 結果を元にした反証レビュー ＆ Plan 策定（Plan Refutation Review & Planning）
 - Step 7 のユーザー回答をすべて統合し、具体的な実装計画（`implementation_plan.md` および実行可能な TODO リスト）を作成する。
-- 作成した Plan が「Step 2 のゴール」「Step 4 の基本方針」「Step 7 の詳細指定」および「コードベースの不変条件」をすべて満たしているか、**Plan に対する反証レビュー（`carbon-verifier` / `second-opinion-lite` 等）** を行う。
-- 反証レビューで指摘された抜け漏れ・矛盾を解消し、最終的な Plan を確定させる。
+- 複数モジュール横断や不可逆リスクを伴う計画では、確定前にスキル **`planning-advisor`**（Swarm の Single Opus High / Dual `Opus High × Carbon High`）で横断設計アドバイスを取得するか、**Plan に対する反証レビュー（`carbon-verifier` / `second-opinion-lite` 等）** を行い、「Step 2 のゴール」「Step 4 の基本方針」「Step 7 の詳細指定」および「コードベースの不変条件」をすべて満たしているか検証する。
+- 指摘された抜け漏れ・矛盾を解消し、最終的な Plan を確定させる。
 
 ### Step 9: 実装開始（Start Implementation）
 - 反証レビュー済みの確定 Plan に基づき、実装を開始する。

@@ -44,11 +44,12 @@ agents:
   - second-opinion-lite
   - web-production-readiness-reviewer
   - stripe-billing-readiness-reviewer
+  - planning-advisor
 ---
 
 # Multi-Agent Opinion Orchestrator（リスク比例・複眼型セカンドオピニオン統括）
 
-コード差分、課題ゴール（Mode B）、または設計提案ドラフト（Mode C）に対し、独立した専門サブエージェント群とマインドフルネス事実再検査を統括するオーケストレーターです。各専門レビュアーのプロンプト正本は `agents/*.md` です。
+コード差分、課題ゴール（Mode B）、または設計提案ドラフト（Mode C：計画時点の横断助言には `planning-advisor` を選択可）に対し、独立した専門サブエージェント群とマインドフルネス事実再検査を統括するオーケストレーターです。各専門レビュアーのプロンプト正本は `agents/*.md` です。
 
 ## 1. スケーリング選択（Tier 2 既定 / Tier 3 フル起動）
 - **Tier 2（既定 — ドメイン選抜モード）**: 変更内容・対象領域に直結するステージ1専門レビュアー **3〜6体** を選抜して並行起動する（無関係な専門領域は起動しない）。
@@ -70,7 +71,7 @@ agents:
 1. **対象準備（クリーンルーム規律）**:
    - **モードA（成果物レビュー）**: `.env*`・鍵を除外し機密マスクした差分/対象コードを自身の `<appDataDir>/brain/<自身のconversation-id>/scratch/` に配置し、不変条件仕様（Invariants Spec / docs）のみを添える（作成経緯・言い訳は渡さない）。
    - **モードB（3ストライク発想転換）**: 達成したいゴールと対象パスのみを渡す（状況遮断）。
-   - **モードC（設計提案反証）**: 提案ドラフト・解決すべき症状・現行コードと仕様のパスを渡す。
+   - **モードC（設計提案反証 / 計画前アドバイス）**: 提案ドラフト・解決すべき症状・現行コードと仕様のパスを渡し、着手前の横断設計助言を優先する場合は `planning-advisor`（トップレベルからの Swarm High 召喚時はスキル `planning-advisor`）を活用する。
 2. **ステージ1並行起動 (`Model: "flash"`)**:
    - Tier 2（選抜3〜6体）または Tier 3（全15体）を `invoke_subagent` で並行起動し、`schedule`（`DurationSeconds=180, TimerCondition="never"`）を設定する。全 `[CLEAN]` ならステージ2を省略し Clean Pass とする。
 3. **ステージ2再検査・複合監査**:

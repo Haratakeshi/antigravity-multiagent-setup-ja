@@ -12,9 +12,9 @@
    - Internal-First PAC（内部思考優先・高シグナル4地点開示）、着手前の前提検証、確信度の校正、3ストライク時の視点リセット、完了前セルフレビュー、副作用境界（Human Gate）、Chrome 144+ DevTools 直結デッドロック禁止。
 2. **4つのコアプラグイン（`~/.gemini/config/plugins/` — 配置のみで自動ロード）**:
    - `agy-harness`: 実装規律（§4〜§11）＋ 5つの機械的 Lifecycle Hooks（`npm`/`pip`/`@latest` ブロック、`/tmp` 安全削除許容つきの破壊コマンド確認、テスト skip/恒真検知、`localhost` 素通し＆信頼境界ドメイン確認、40回周期の軽量日付Grounding注入、v2.30+ スマート完了ゲート）＋ `second-opinion-lite` スキル。
-   - `multi-agent-kit`: 監査独立性規律（§3）＋ Tier 0〜3 リスク比例スケーリング（日常セルフ確認 / 中規模高速監査 / ドメイン選抜3〜6体 / リリース前フル15+3体）による 3-Strike PDCA パイプライン（`multi-agent-opinion`、`mindfulness`、`visual-verification-loop`、Web/Stripe本番監査）＋ 節目・異種ベンダー監査用の **Swarm 動的モデル解決パネル**（§4）。
+   - `multi-agent-kit`: 監査独立性規律（§3）＋ Tier 0〜3 リスク比例スケーリング（日常セルフ確認 / 中規模高速監査 / ドメイン選抜3〜6体 / リリース前フル15+3体）による 3-Strike PDCA パイプライン（`multi-agent-opinion`、`mindfulness`、`visual-verification-loop`、Web/Stripe本番監査）＋ 計画前 `planning-advisor` ＆ 節目・異種ベンダー監査用の **Swarm 動的モデル解決パネル**（§4）。
    - `multi-axis-investigation-kit`: 認知的閉鎖を防ぐ直交多軸探索・内外両面観測・並列 Flash 調査展開規律（`multi-axis-investigation`）。
-   - `claude-orchestrator-kit`: メインモデル（Gemini 4 Neon / Carbon / Argon / Hydrogen / Flash / 内蔵 Claude）に応じた損益分岐点オーケストレーション＆レイテンシ最適化規律 ＋ `flash-runner` / `flash-implementer` / `flash-investigator` / `flash-e2e-verifier` / `carbon-verifier` / `senior-architect-advisor` ＋ 標準軍師 `ask-opus`（`swarm(action="models")` で最新内蔵 Claude Opus High を動的選択） / `claude-exit-review` / Human明示＋商用API限定の `ask-fable`。
+   - `claude-orchestrator-kit`: メインモデル（Gemini 4 Neon / Carbon / Argon / Hydrogen / Flash / 内蔵 Claude）に応じた損益分岐点オーケストレーション＆レイテンシ最適化規律 ＋ `flash-runner` / `flash-implementer` / `flash-investigator` / `flash-e2e-verifier` / `carbon-verifier` / `senior-architect-advisor` ＋ 計画時点 `planning-advisor` / 標準軍師 `ask-opus`（`swarm(action="models")` で最新内蔵 Claude Opus High / Carbon High を動的選択） / `claude-exit-review` / Human明示＋商用API限定の `ask-fable`。
 3. **4つの日常グローバルスキル（`~/.gemini/config/skills/`）**:
    - `grill-me` / `grilling`: 9ステップの段階的ゴール合意・1項目1Ask方針すり合わせ・反証レビュー統合ワークフロー。
    - `package-supply-chain`: `pnpm` / `uv`・固定バージョン・lockfile 規律。

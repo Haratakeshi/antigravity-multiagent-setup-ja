@@ -9,6 +9,7 @@ description: 解決困難なバグ、状態遷移や非同期の設計判断、�
 
 - **100% Antigravity 内蔵ファーストパーティ実行**: 外部 `claude` CLI や個人向けサブスクリプション OAuth を一切使用しないため、Anthropic / Google 双方の利用規約に完全準拠し、追加の従量 API 課金も発生しません。
 - 外部 API 経由の **Claude Fable 5.2 (`ask-fable`)** は、**人間（Human）がチャットで明示的に `ask-fable`（外部 Fable 5.2 API 利用）を指示した重要局面のみ** 使用し、通常の自律判断・3ストライク時は必ず本スキル（`ask-opus`）を使用します。
+- **用途の使い分け**: **実装着手前の計画・複数モジュール横断の設計助言**には **`planning-advisor`**（Single Opus High / Carbon High / Dual High プリセット）、**実装途中の詰まり・3ストライク・単発トレードオフ**には本スキル（`ask-opus`）を使用してください。
 
 ---
 
