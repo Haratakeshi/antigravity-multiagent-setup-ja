@@ -28,7 +28,7 @@ def prune_stale_state(target_dir: str) -> None:
     try:
         with os.scandir(target_dir) as it:
             for entry in it:
-                if not entry.name.endswith((".count", ".stopgate", ".bingate", ".procgate", ".catchgate")):
+                if not entry.name.endswith((".count", ".stopgate", ".bingate", ".procgate", ".catchgate", ".hgturn")):
                     continue
                 try:
                     if entry.stat(follow_symlinks=False).st_mtime < cutoff:

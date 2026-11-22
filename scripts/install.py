@@ -111,6 +111,30 @@ def inspect_environment(target_home: Path) -> dict:
             except OSError:
                 pass
 
+    has_gemini_decision_api = len(os.environ.get("GEMINI_API_KEY", "").strip()) >= 10
+    if not has_gemini_decision_api:
+        dotenv_p = gemini_dir / ".env"
+        if dotenv_p.is_file():
+            try:
+                for raw_l in dotenv_p.read_text(encoding="utf-8", errors="replace").splitlines():
+                    s_l = raw_l.strip()
+                    if not s_l or s_l.startswith("#"):
+                        continue
+                    if s_l.startswith("export ") or s_l.startswith("export\t"):
+                        s_l = s_l[6:].strip()
+                    if "=" not in s_l:
+                        continue
+                    k_l, v_l = s_l.split("=", 1)
+                    if k_l.strip() == "GEMINI_API_KEY":
+                        val_s = v_l.strip()
+                        if val_s.startswith(('"', "'")):
+                            val_s = val_s.split(val_s[0], 2)[1] if val_s.count(val_s[0]) >= 2 else val_s[1:]
+                        else:
+                            val_s = val_s.split("#", 1)[0].strip()
+                        has_gemini_decision_api = len(val_s.strip()) >= 10
+            except OSError:
+                pass
+
     return {
         "os": platform.system(),
         "platform": platform.platform(),
@@ -126,6 +150,12 @@ def inspect_environment(target_home: Path) -> dict:
             "default: native_antigravity_opus_5_5_high (ask-opus) | explicit_human_ask_fable: enabled (commercial_api --bare)"
             if (claude_bin and has_commercial_claude_api)
             else "default: native_antigravity_opus_5_5_high (ask-opus) | explicit_human_ask_fable: blocked_until_anthropic_api_key_set (ToS protection)"
+        ),
+        "gemini_decision_api_configured": has_gemini_decision_api,
+        "human_gate_mode": (
+            "phase2_auto_allow (gemini-decision-1)"
+            if has_gemini_decision_api
+            else "phase2_fallback_force_ask (optional: set GEMINI_API_KEY in ~/.gemini/.env for auto-allow)"
         ),
         "target_home": str(target_home),
         "existing_gemini_md": (gemini_dir / "GEMINI.md").is_file(),
@@ -390,6 +420,8 @@ def main() -> int:
         "newly_created_count": len(manifest["created_items"]),
         "environment": {
             "claude_mode": env_info["claude_fallback_mode"],
+            "gemini_decision_api_configured": env_info["gemini_decision_api_configured"],
+            "human_gate_mode": env_info["human_gate_mode"],
             "pnpm_found": bool(env_info["pnpm"]),
             "uv_found": bool(env_info["uv"]),
             "node_found": bool(env_info["node"]),

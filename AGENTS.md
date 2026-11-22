@@ -11,7 +11,7 @@
 1. **`~/.gemini/GEMINI.md`（グローバル憲法 §0〜§2）**:
    - Internal-First PAC（内部思考優先・高シグナル4地点開示）、着手前の前提検証、確信度の校正、3ストライク時の視点リセット、完了前セルフレビュー、副作用境界（Human Gate）、Chrome 144+ DevTools 直結デッドロック禁止。
 2. **4つのコアプラグイン（`~/.gemini/config/plugins/` — 配置のみで自動ロード）**:
-   - `agy-harness`: 実装規律（§4〜§11）＋ 5つの機械的 Lifecycle Hooks（`npm`/`pip`/`@latest` ブロック、`/tmp` 安全削除許容つきの破壊コマンド確認、テスト skip/恒真検知、`localhost` 素通し＆信頼境界ドメイン確認、40回周期の軽量日付Grounding注入、v2.30+ スマート完了ゲート）＋ `second-opinion-lite` スキル。
+   - `agy-harness`: 実装規律（§4〜§11）＋ 5つの機械的 Lifecycle Hooks（`npm`/`pip`/`@latest` ブロック、ワークスペース/`/tmp`/`.worktrees` 内安全削除許容＆非ブロッキング `[DEFER_HUMAN_GATE]` ＋ `gemini-decision-1` 第2フェーズ承認検証、テスト skip/恒真検知、`localhost` 素通し＆信頼境界ドメイン確認、40回周期の軽量日付Grounding注入、v2.30+ スマート完了ゲート）＋ `second-opinion-lite` スキル。
    - `multi-agent-kit`: 監査独立性規律（§3）＋ Tier 0〜3 リスク比例スケーリング（日常セルフ確認 / 中規模高速監査 / ドメイン選抜3〜6体 / リリース前フル15+3体）による 3-Strike PDCA パイプライン（`multi-agent-opinion`、`mindfulness`、`visual-verification-loop`、Web/Stripe本番監査）＋ 計画前 `planning-advisor` ＆ 節目・異種ベンダー監査用の **Swarm 動的モデル解決パネル**（§4）。
    - `multi-axis-investigation-kit`: 認知的閉鎖を防ぐ直交多軸探索・内外両面観測・並列 Flash 調査展開規律（`multi-axis-investigation`）。
    - `claude-orchestrator-kit`: メインモデル（Gemini 4 Neon / Carbon / Argon / Hydrogen / Flash / 内蔵 Claude）に応じた損益分岐点オーケストレーション＆レイテンシ最適化規律 ＋ `flash-runner` / `flash-implementer` / `flash-investigator` / `flash-e2e-verifier` / `carbon-verifier` / `senior-architect-advisor` ＋ 計画時点 `planning-advisor` / 標準軍師 `ask-opus`（`swarm(action="models")` で最新内蔵 Claude Opus High / Carbon High を動的選択） / `claude-exit-review` / Human明示＋商用API限定の `ask-fable`。
@@ -40,7 +40,7 @@ python3 scripts/install.py --check
 
 診断結果から以下を確認します：
 - **既存の `~/.gemini/GEMINI.md` や同名プラグインが存在する場合**: インストーラが自動で `~/.gemini/backups/setup-baseline/` に初回ベースラインバックアップを作成・維持することをユーザーに伝えます（もしユーザーが独自のカスタム記述を `GEMINI.md` に書いている場合は、後でマージするかそのまま置き換えるか確認しても構いません）。
-- **外部 `claude` CLI や API キーが無い場合でも追加設定は一切不要**: 本セットアップの通常運用は **100% Antigravity 内蔵モデルのみ** で完結します（標準軍師 `ask-opus` は `swarm(action="models")` で最新内蔵 Claude Opus High を動的選択、出口監査は `carbon-verifier` / `second-opinion-lite`、Stage 2 再検査は `mindfulness-inspector`）。なお Anthropic 利用規約（Consumer Terms の自動化アクセス制限）を遵守するため、個人サブスク OAuth（`claude.ai` Pro/Max）経由での外部 `claude -p` 自動呼び出しは機械的に遮断されており、外部 `ask-fable` はユーザーが明示指示し、かつ商用 `ANTHROPIC_API_KEY` を設定した時のみ `--bare` モードで動作します。
+- **外部 `claude` CLI や `GEMINI_API_KEY` が無い場合でも追加設定は一切不要**: 本セットアップの通常運用は **100% Antigravity 内蔵モデルのみ** で完結し、`Human Gate（[DEFER_HUMAN_GATE]）` もキー未設定時は第2フェーズで自動的に安全な `force_ask` 確認フォールバックに切り替わります（さらに `~/.gemini/.env` に `GEMINI_API_KEY` を設定すると、承認返信後の再実行を `gemini-decision-1` でチャット承認のまま自動通過できます）。標準軍師 `ask-opus` は `swarm(action="models")` で最新内蔵 Claude Opus High を動的選択、出口監査は `carbon-verifier` / `second-opinion-lite`、Stage 2 再検査は `mindfulness-inspector` を使用します。なお Anthropic 利用規約（Consumer Terms の自動化アクセス制限）を遵守するため、個人サブスク OAuth（`claude.ai` Pro/Max）経由での外部 `claude -p` 自動呼び出しは機械的に遮断されており、外部 `ask-fable` はユーザーが明示指示し、かつ商用 `ANTHROPIC_API_KEY` を設定した時のみ `--bare` モードで動作します。
 - **`node` が存在する場合**: 標準インストール（`python3 scripts/install.py`）で Smart `process-review-gate.mjs`（Tier 0 軽微変更素通し・空 `catch` 検知・Tier 1 出口反証レビュー確認 Stop Hook）が `~/.gemini/config/hooks.json` へ自動マージ導入されます（不要な場合のみ `--without-process-gate` でスキップ可能）。
 - **`claude_cli` が存在する場合**: `--with-claude-skills` を付けることで `~/.claude/skills/grilling/` にも同じ 9ステップ `grilling` スキルを同期できます。
 

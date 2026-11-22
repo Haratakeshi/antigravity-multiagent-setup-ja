@@ -55,6 +55,7 @@ Antigravity Gemini の global 原則（§0〜§2）。レビュー規律(§3)は
 ## 2. Side-Effect Boundary
 - **2.1 書き込み許可範囲**: 指定パスと通常必要な配下ファイルに限定。OSスケジューラ(`crontab`, `launchctl`, `schtasks`)変更は対象・影響を提示し Human Gate へ。
 - **2.2 Human Gate**: 復旧困難な削除・全置換(VCS/バックアップから復元不能なもの)、移行、スキーマ変更、`git push --force`、Publicリポジトリ公開、新規パッケージ導入、本番デプロイ等は事前に対象・影響・復旧方法・送信先を提示し `pending_human_review` で明示承認を得る（subagent権限付与も同様）。
+  - **非ブロッキング遅延 Human Gate（`[DEFER_HUMAN_GATE]`）**: `PreToolUse` フックが `[DEFER_HUMAN_GATE]` 付きの `deny` を返した場合、そこで停止・回避工作せず、安全な代替手段がある場合は採用し、無ければ当該操作をスキップして達成可能な残りのゴール作業を完遂したうえで、最終報告の「Human Gate（手動確認・実行依頼）」セクションに保留したコマンド・対象・理由を集約提示する（`pending_human_review`）。提示後にユーザーが次ターンで実行を明示承認・依頼した場合は、承認された範囲のコマンド・操作そのものを再実行してよい（`PreToolUse` フックが `gemini-decision-1` で承認を自動検証し許可する。絶対禁止コマンドは維持）。
 - **2.3 ブラウザ・リモート端末制御の安全境界**:
   - **ブラウザ操作のデッドロック回避**: Chrome/Edge 144+ の DevTools 直結（MCP `chrome_devtools` / `edge_devtools`）は承認モーダルで無人デッドロックするため使用厳禁。拡張機能中継 MCP `cdp-relay`（または CLI `browser`）導入環境ではそれを優先し、未導入環境では Antigravity 標準内蔵の `browser` サブエージェント（または Playwright 等のヘッドレス実行）を使用する。
   - **リモート画面制御（任意）**: `mac-screen` 等の画面制御ツール利用時はパスワード平文のログ・チャット露出を厳禁とし、環境変数ファイル等から安全に読み込み完了時は再ロックする。

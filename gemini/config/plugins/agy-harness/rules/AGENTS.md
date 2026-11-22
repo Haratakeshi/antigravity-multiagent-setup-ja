@@ -41,4 +41,4 @@
 
 ## 11. 機械的ガードレール (agy-harness Hooks)
 - `command-guard` / `test-integrity-guard` / `trust-boundary-guard` / `session-grounding` / `completion-gate`。
-- deny 時は代替手順を採用、ask/force_ask 時は対象・影響・復元手順を提示し Human Gate へ、完了ゲート発火時は `§0.5` を満たして終了。
+- `/tmp`・`$TMPDIR`・`scratch` およびアクティブなワークスペース(`workspacePaths`)内の安全な `rm` / ファイル削除（`.worktrees/<branch>/<通常ファイル>` を含み、`.worktrees` / `.worktrees/<branch>` ルートや `.git`/`.env` 等は保護維持）は自動通過(`allow`)し、ワークスペース外・保護対象・破壊的操作は非ブロッキング `deny`（`[DEFER_HUMAN_GATE]`）を返す。`[DEFER_HUMAN_GATE]` 時は代替手順を採るか操作をスキップしてゴールまで進め、最終報告で Human Gate（`pending_human_review`）へ集約提示する（ユーザーが次ターンで明示承認・実行依頼した場合は、`PreToolUse` フックの `gemini-decision-1` 承認検証により再実行許可；完了ゲート発火時は `§0.5` を満たして終了）。

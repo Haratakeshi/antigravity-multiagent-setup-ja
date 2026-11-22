@@ -27,8 +27,8 @@ LLM エージェントに「丁寧に実装してください」「バグがな�
 
 ### ② 機械的ガードレールとスマート素通し (`agy-harness` Lifecycle Hooks)
 プロンプトのルールは忘却されることがありますが、`hooks.json` によるプロセス外スクリプトは 100% 発火します：
-- **`guard_commands.py` (`PreToolUse`)**: `npm install` / `pip install` / `@latest` / `--no-verify` / `curl | sh` を実行前にブロックし、その場で `pnpm` / `uv` への最適解をエージェントに提示します。`rm` や `git reset --hard` は `force_ask` で人間の承認を必須化しつつ、`/tmp/<具体名>`（シンボリックリンク越境・ワイルドカード・ブレース展開なし）に限定した一時ファイル削除のみ安全に自動許可します。
-- **`guard_file_edits.py` (`PreToolUse`)**: `/tmp/<具体名>` 以外のファイル削除確認に加え、テストファイルへの `.only()` / `.skip()` / `expect(true).toBe(true)` / 空 `except: pass` 混入を検知して警告します。
+- **`guard_commands.py` (`PreToolUse`)**: `npm install` / `pip install` / `@latest` / `--no-verify` / `curl | sh` を実行前にブロックし、その場で `pnpm` / `uv` への最適解をエージェントに提示します。`/tmp`・`$TMPDIR`・`scratch` に加えて **アクティブなワークスペース（`workspacePaths`）配下の安全対象（`.worktrees/<branch>/<通常ファイル>` を含み、`.git`/`.env`/`.worktrees` ルート等は保護維持）の `rm`** を自動許可しつつ、ワークスペース外・破壊的操作・`git branch -D` 等は UI を止めない非ブロッキング `deny`（`[DEFER_HUMAN_GATE]`）でスキップさせ、`Human Gate（pending_human_review）` 提示後の次ターンでユーザーが明示承認した操作のみ **`gemini-decision-1`** による4軸 `noul` 検証（`_human_gate_decision.py`）で安全に自動通過させます。
+- **`guard_file_edits.py` (`PreToolUse`)**: `/tmp`・`$TMPDIR`・`scratch`・ワークスペース内の安全対象以外の削除や、テストファイルへの `.only()` / `.skip()` / `expect(true).toBe(true)` / 空 `except: pass` 混入を非ブロッキング `[DEFER_HUMAN_GATE]` として検知・保留し、次ターン承認時は同様に `gemini-decision-1` 検証に対応します。
 - **`guard_urls.py` (`PreToolUse`)**: `localhost` / `[::1]` 等のローカル開発サーバーと公式ドメインを素通ししつつ、`urlsplit` により `?`・`#`・`userinfo@`・`\` 偽装を含む未知ドメインアクセスを確認へ回します。
 - **`session_context.py` (`PreInvocation`)**: 会話開始時と40回の呼び出しごとに今日の日付と1行リマインドを公式 `systemMessage` 形式で軽量注入し、長時間の会話でも規律の風化を防ぎます。
 - **`stop_selfreview.py` (`Stop`)**: 実ファイル変更を伴うターンで完了マーカー（`GOAL_COMPLETE` 等）が欠落しているとき、または未追跡バイナリが30件以上放置されているときのみ引き止め、質問応答・調査のみの会話や既にセルフレビュー済みの応答は追加レイテンシゼロで即座に `allow` 素通しします。

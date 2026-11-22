@@ -23,7 +23,32 @@ Anthropic の個人向け利用規約（Consumer Terms of Service）では、個
 
 ---
 
-## 2. ブラウザ操作環境（`cdp-relay` vs 内蔵 `browser` サブエージェント）
+## 2. Human Gate 第2フェーズ自動通過（Gemini Decision 1）の設定
+
+`agy-harness`（v1.8+）では、ワークスペース外・保護対象・`git branch -D` などの要注意操作を「確認ダイアログで即停止」させず、まず非ブロッキング `deny`（`[DEFER_HUMAN_GATE]`）でスキップして残りのゴール作業を完遂し、最終報告の **「Human Gate（手動確認・実行依頼）」**（`pending_human_review`）へ集約提示します。
+
+### ① `GEMINI_API_KEY` 未設定時 vs 設定時の挙動
+
+- **未設定時（そのままでも利用可能）**:
+  - ユーザーが次ターンで承認・実行依頼した場合、Phase 2 フォールバックとして **`force_ask`**（Antigravity 標準の確認ボタンを1回表示）へ切り替わり、安全に実行できます（自動スキップのまま完全 `deny` にしたい場合は環境変数 `AGY_HUMAN_GATE_FALLBACK=deny` を設定します）。
+- **設定時（チャット承認だけで自動通過 — 推奨）**:
+  - Google AI Studio 等で取得した `GEMINI_API_KEY` を `~/.gemini/.env`（パーミッション `600` 推奨）に設定すると、`PreToolUse` フックが **`gemini-decision-1`**（Gemini Decisions API: `POST https://generativelanguage.googleapis.com/v1beta/decisions`）で前ターンの Human Gate 提案・最新の `USER_EXPLICIT` 返信・実行予定コマンドの3点を照合し、**4問の `noul` 判定（承認・スコープ一致・難読化なし・非壊滅的）がすべて高確信で Yes** の場合のみ自動で `allow` します。
+
+```bash
+# ~/.gemini/.env に追記する例（絶対にリポジトリへコミットしないこと）
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+```
+
+### ② コスト・レイテンシ・セキュリティ設計
+
+- **平時コスト・オーバーヘッドゼロ**: 通常の許可コマンド（`allow`）や禁止コマンド（`DENY`）では `_human_gate_decision` や `urllib` を遅延インポートで一切読み込まず、API も呼びません。前ターンに `pending_human_review` がある承認返信時のみ発火します。
+- **低コスト・高速**: `gemini-decision-1` はテキスト生成を行わず確率のみを返すため **出力トークン 0**（入力単価も低コスト）、実測 **約 300〜500 ms** で判定が完了します。
+- **バイパス不能境界**: `curl | sh` / `npm install` / `pip install` / `--no-verify` / `crontab` 等の Hard `DENY`、およびルート `/`・ホーム `~`・システム領域・`~/.ssh` 等や `dd of=/dev/*`・`mkfs*`・`diskutil erase*/apfs delete*` 等の壊滅的レッドラインは Decision 1 を呼ばず常に `deny` を維持します。
+- **監査ログ**: 第2フェーズの判定結果（`decision`, `latency_ms`, 各問スコア。API キーは記録対象外）は `~/.local/state/agy-harness/human_gate_decisions.jsonl` に記録されます。
+
+---
+
+## 3. ブラウザ操作環境（`cdp-relay` vs 内蔵 `browser` サブエージェント）
 
 - Chrome / Edge 144 以降では、MCP の `chrome_devtools` / `edge_devtools` 直結を使うとブラウザ側にモーダル承認ダイアログが出て無人実行がデッドロックするため、`GEMINI.md §2.3` で使用を禁止しています。
 - 標準では **Antigravity 内蔵の `browser` サブエージェント**（または Playwright 等のヘッドレス E2E）がそのまま使われます。
@@ -31,7 +56,7 @@ Anthropic の個人向け利用規約（Consumer Terms of Service）では、個
 
 ---
 
-## 3. ルールファイルを自分好みに編集する際の鉄則（24,000バイト制限）
+## 4. ルールファイルを自分好みに編集する際の鉄則（24,000バイト制限）
 
 Antigravity のルールファイル（`GEMINI.md` および各 `AGENTS.md`）には **1ファイルあたり 24,000 バイトの上限** があり、超過分は警告なしで末尾から切り捨てられます。
 
@@ -49,7 +74,7 @@ python3 scripts/verify.py
 
 ---
 
-## 4. `agy-harness` の Hook を一部調整・無効化したい場合
+## 5. `agy-harness` の Hook を一部調整・無効化したい場合
 
 - **特定ドメインを信頼境界（URL アクセス許可リスト）に追加したい場合**:
   自社や個人プロジェクト固有のドメインは `~/.gemini/config/allowed_domains.local.txt` を新規作成して1行1ドメインで記載するのが推奨です（サブドメインも自動許可され、`install.py` の再実行でも上書きされません。共通リスト `~/.gemini/config/plugins/agy-harness/scripts/allowed_domains.txt` への追記も可能です）。

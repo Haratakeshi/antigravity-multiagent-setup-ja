@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![PRs: Not Accepted (Fork Friendly)](https://img.shields.io/badge/PRs-Not%20Accepted%20(Fork%20Friendly)-orange.svg)](./CONTRIBUTING.md)
-[![Antigravity: v2.33+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Neon%20%2F%20Carbon%20v1.7-4285F4.svg)](#-v17--v16-アップデート-計画時点-planning-advisor-理念ssot--swarm動的モデル解決)
+[![Antigravity: v2.33+ Ready](https://img.shields.io/badge/Google%20Antigravity-Gemini%204%20Neon%20%2F%20Carbon%20v1.8-4285F4.svg)](#-v18-アップデート-非ブロッキング-human-gate--gemini-decision-1-承認自動通過--ワークスペース内-rm-許容)
 
-Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（2レーン・3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Neon / Carbon / Hydrogen / 最新内蔵 Claude Opus (High) のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
+Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・前提検証・確信度校正）**、**機械的ガードレール（ワークスペース対応・非ブロッキング Human Gate × Gemini Decision 1・スマート Hooks & Zero-Tax Anti-Hang）**、**リスク比例 Tier 0〜3 複眼セカンドオピニオン（2レーン・3-Strike PDCA）**、**9ステップの段階的要件定義（Grill-Me / Grilling）**、および **Gemini 4 Neon / Carbon / Hydrogen / 最新内蔵 Claude Opus (High) のモデル適応オーケストレーション** を即座に再現するための個人運用セットアップ集です。
 
 > [!NOTE]
 > **📖 オープン公開ポリシー（閲覧・利用・Fork 自由 / PR 受付なし）**
@@ -12,22 +12,28 @@ Google **Antigravity** 上で、**推論の自己監視（Internal-First PAC・�
 
 ---
 
-## 🆕 v1.7 / v1.6 アップデート: 計画時点 `planning-advisor` ＆ 理念SSOT × Swarm動的モデル解決（2レーン設計）
+## 🆕 v1.8 アップデート: 非ブロッキング Human Gate × Gemini Decision 1 承認自動通過 ＆ ワークスペース内 `rm` 許容
 
-Claude Code の **Advisor Strategy** を Antigravity へ統合し、さらにモデルの世代交代（`Gemini 4 Neon`・`Gemini 4 Hydrogen` 等）に左右されず最新・異種ベンダーの頭脳で事前相談・事後監査を行えるよう、**「理念正本（`agents/*.md` SSOT）とモデル選定の分離」** を実施しました（v1.5 のスマート出口反証ゲート・Zero-Tax 3層防衛・ToS ガード・高速パスもすべて包含）：
+「プロジェクト内の安全な `rm` なのに毎回確認ダイアログで止まる」「Human Gate で保留したコマンドをチャットで承認して再実行を頼んでも `PreToolUse` フックが文脈を知らないため再び拒否される」という 2 つの詰まりを解消しました：
 
-1. **計画時点の横断設計アドバイザー（`planning-advisor` — v1.7 NEW）**:
-   - Antigravity App v2.33.0 / CLI v1.5.10+ での長時間推論タイムアウト解消を活かし、主担当（`Orchestrator (Neon)` 等）が実装へ踏み切る前に **`planning-advisor`** スキル（SSOT: `multi-agent-kit/agents/planning-advisor.md`）を起動。
-   - **Single Opus High** / **Single Carbon High** / **Dual High（`Opus High × Carbon High` 並列召喚）** の 3 プリセットを `swarm(action="models")` で動的解決し、責務境界・SSOT 整合・不可逆地雷・簡潔な代替構造の短尺戦略助言を取得します（`plan-*-advisor` は事前助言専用で、`process-review-gate.mjs` をバイパスしません）。
-2. **2レーンハイブリッド複眼監査（`multi-agent-opinion` ＋ `process-review-gate.mjs` v1.5.2）**:
-   - **Lane 1（通常・高速レーン・`invoke_subagent`）**: 日常の Tier 1（`second-opinion-lite` / `carbon-verifier`）および軽量 Tier 2 は、機械的 Read-Only・完全隔離・最速の `invoke_subagent`（`flash` ティア＝最新版 Antigravity では `Gemini 4 Hydrogen High` に自動追従）を維持。
-   - **Lane 2（Swarm 動的モデル解決パネル・`swarm`）**: 節目の重要設計・大型アップデートの総合反証・最新モデル＋異種ベンダー（Gemini × Claude）複眼レビューでは、`swarm(action="models")` からその時点の最新 Fast / Frontier / Claude Opus High を動的解決し、`agents/*.md` の理念を注入して2フェーズ独立査読（`process-review-gate.mjs` v1.5.2 でも Read-Only `workspace: "inherit"` の Swarm 監査を正式認識）。
-3. **`ask-opus` の動的最新モデル追従 ＆ Gemini 4 Neon / Hydrogen 適応**:
-   - `ask-opus` は固定モデル ID をハードコードせず、`swarm(action="models")` からその時点の最新内蔵 `claude-opus-*-high`（例: `claude-opus-5-5-high`）を動的選択。`claude-orchestrator-kit` も `Gemini 4 Neon` / `Carbon` / `Hydrogen` 世代に対応済み。
-4. **スマート出口反証ゲート・Zero-Tax 3層 Anti-Hang・ToS 完全準拠ガード（v1.5 継続搭載）**:
-   - **Tier 0 ⇔ Tier 1+ 境界**: 文書・設定・CSS・単一コード`25行未満`の微修正は 0秒素通し。`flash-implementer` 委譲後や `>= 2` ファイル / `>= 25` 行変更時は `process-review-gate.mjs` が機械的に反証監査を確認（`-U3` hunk 比較で空 `catch {}` も遮断）。
-   - **Zero-Tax 3層 Anti-Hang**: `guard_commands.py` の無限待機コマンド事前 `deny` ＋ プロセス内ハード上限（§9.4）＋ 実測 `p90` 個別 ID 監視。
-   - **ToS 完全準拠2段分離**: 日常相談・監査は 100% Antigravity 内蔵モデルで完結し、外部 `claude-fable-5-2` スクリプトは「Human 明示指示（`--human-authorized`）」＋「商用 `ANTHROPIC_API_KEY`」時のみ `--bare` モード（OAuth/Keychain 非読取）で動作。
+1. **ワークスペース内 `rm` / `.worktrees` 安全ファイル削除の自動許可（`allow`）**:
+   - `_workspace_guard.py` により、`/tmp`・`$TMPDIR`・`scratch` に加えて **アクティブなワークスペース（`workspacePaths`）配下の安全対象**（さらに `.worktrees/<branch>/<通常ファイル>` 配下の一時画像・中間ファイル削除や worktree 内 `cd`）をグローバル設定のまま自動許可。
+   - ワークスペース外・私的領域・`.git`・`.env`・鍵ファイル・ネスト `.git` を含む親フォルダ削除・`.worktrees` / `.worktrees/<branch>` ルートおよび直下保護グロブ（`.worktrees/<branch>/*`）は引き続き厳格にブロックします。
+2. **非ブロッキング遅延 Human Gate（`[DEFER_HUMAN_GATE]`）**:
+   - ワークスペース外削除・`git branch -D`・`git reset --hard` 等は UI の確認待ち（`force_ask`）で作業を中断せず、`[DEFER_HUMAN_GATE]` 付きの非ブロッキング `deny` でその場のみスキップ。残りのゴール作業を完遂したうえで、最終報告の「Human Gate（手動確認・実行依頼）」セクション（`pending_human_review`）へ一括提示します。
+3. **`Gemini Decision 1` (`gemini-decision-1`) による第2フェーズ承認自動検証**:
+   - 前ターンに `pending_human_review` が提示され、ユーザーが次ターン（`USER_EXPLICIT`）で実行を明示承認・依頼したときだけ遅延インポートで起動（平時の通常コマンド・Hard `DENY`・サブエージェントは遅延・API コストとも **0**）。
+   - `user_explicitly_approved` / `candidate_matches_approved_scope` / `no_obfuscation_or_hidden_escalation` / `targets_non_catastrophic` の **4問 `noul` を並列 1 リクエスト・出力トークン 0（約 300〜500 ms）** で評価し、全問高確信時のみ自動 `allow`（部分承認の絞り込みにも対応し、拒否・質問・スコープ拡大・プロンプトインジェクションはハード `deny`）。
+   - `GEMINI_API_KEY` 未設定時・曖昧スコア・障害時は Phase 2 のみ `force_ask` フォールバック（完全 `deny` 切替可）。Hard `DENY`（`curl | sh`, `npm`/`pip install`, `--no-verify`, `crontab`）および壊滅的レッドライン（`/`, `~`, システム領域, `~/.ssh`, `dd of=/dev/*`, `mkfs*`, `diskutil erase*/apfs delete*` 等）は Decision 1 へ渡さず常に `deny`（`install.py --check` / `docs/CUSTOMIZATION_GUIDE.md` 参照）。
+
+<details>
+<summary>📌 v1.7 / v1.6 の主な搭載機能（継続搭載）</summary>
+
+1. **計画時点の横断設計アドバイザー（`planning-advisor` — v1.7）**: `Orchestrator (Neon)` 等が実装へ踏み切る前に Single Opus High / Single Carbon High / Dual High 並列から短尺戦略助言を取得（`process-review-gate.mjs` 非バイパス）。
+2. **2レーンハイブリッド複眼監査（`multi-agent-opinion` ＋ `process-review-gate.mjs` v1.5.2）**: 日常 Tier 1/軽量 Tier 2 は高速 `invoke_subagent`（Lane 1）、節目・異種ベンダー監査は `swarm(action="models")` の動的解決パネル（Lane 2）を使用。
+3. **`ask-opus` 動的モデル追従 ＆ Zero-Tax 3層 Anti-Hang / ToS 完全準拠ガード**: 日常運用は Antigravity 内蔵モデル完結、`ask-fable` は Human 明示＋商用 `ANTHROPIC_API_KEY`＋`--bare` 限定。
+
+</details>
 
 **既存環境からのアップデート方法**（初回導入時のバックアップベースラインはそのまま安全に保持されます）：
 ```bash
@@ -86,8 +92,8 @@ flowchart TB
     end
 
     subgraph L2["2. 機械的ガードレール (agy-harness Smart Hooks)"]
-        CG["command-guard\n(npm/pip/@latest 禁止・破壊コマンド確認)"]
-        TG["test-integrity-guard\n(.skip/.only/恒真テスト改ざん検知)"]
+        CG["command-guard\n(npm/pip/@latest 禁止・ワークスペースrm許容・Decision 1 承認通過)"]
+        TG["test-integrity-guard\n(ワークスペース/.worktrees保護削除・.skip/恒真改ざん検知)"]
         SG["session-grounding & smart completion-gate\n(40回周期の日付注入 & 変更時のみ証拠ゲート発火)"]
     end
 
@@ -111,13 +117,13 @@ flowchart TB
 |---|---|
 | **§0 Reasoning Protocol** | Internal-First PAC（高シグナル4地点開示）、サプライズの昇格、**3ストライク視点リセット**（`mindfulness` → 標準 `ask-opus`［最新内蔵 Claude Opus High 動的選択］または `multi-agent-opinion` モードB）、着手前の前提検証、証拠出自に基づく確信度校正、完了前セルフレビュー |
 | **§1 Output Discipline** | 自己評価の証拠義務（コマンド＋exit code / `file:line`）、機能ベースの役割名、迎合抑止（疑問文の中立解釈） |
-| **§2 Side-Effect Boundary** | 書き込み境界、不可逆・外部送信操作の Human Gate（`pending_human_review`）、Chrome 144+ DevTools 直結デッドロック禁止 |
+| **§2 Side-Effect Boundary** | 書き込み境界、非ブロッキング遅延 Human Gate（`pending_human_review`＋`gemini-decision-1` 承認後再実行検証）、Chrome 144+ DevTools 直結デッドロック禁止 |
 
 ### 2. 常時展開プラグイン (`gemini/config/plugins/`)
 
 | プラグイン名 | 役割・主な機能 | 同梱スキル / サブエージェント |
 |---|---|---|
-| **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview`） |
+| **`agy-harness`** | 実装規律（§4〜§11）＋ 5種の機械的 Lifecycle Hooks（ワークスペース対応 `rm` ＋ `gemini-decision-1` 第2フェーズ承認検証） | `second-opinion-lite` ＋ 5 Python Hooks（`guard_commands`, `guard_file_edits`, `guard_urls`, `session_context`, `stop_selfreview` ＋ `_workspace_guard`, `_human_gate_decision`） |
 | **`multi-agent-kit`** | 監査独立性規律（§3）＋ Tier 0〜3 リスク比例 3-Strike PDCA レビューパイプライン | スキル: `multi-agent-opinion`, `mindfulness`, `visual-verification-loop`<br>サブエージェント: ステージ1専門レビュアー15体 ＋ ステージ2複眼監査3体 ＋ 計画前アドバイザー `planning-advisor` ＋ `second-opinion-lite` ＋ `web-production-readiness-reviewer` ＋ `stripe-billing-readiness-reviewer` ＋ `visual-verification-reviewer` |
 | **`multi-axis-investigation-kit`** | 1つの発見で探索を止めない直交多軸調査・内外両面観測・反証チェック | スキル: `multi-axis-investigation` |
 | **`claude-orchestrator-kit`** | メインモデル別の損益分岐点分業・レイテンシ最適化（Mode A/B/C）と内蔵 Opus/Carbon 計画助言・軍師・出口監査ゲート | スキル: `planning-advisor`（着手前の横断設計助言・Single/Dual High）, `ask-opus`（実装中の難所相談・最新内蔵 Claude Opus High 動的選択）, `claude-exit-review`, `ask-fable`（Human明示＋商用API限定）<br>サブエージェント: `carbon-verifier`, `senior-architect-advisor`, `flash-runner`, `flash-implementer`, `flash-investigator`, `flash-e2e-verifier` |

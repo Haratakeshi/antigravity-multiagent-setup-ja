@@ -1,15 +1,39 @@
 #!/usr/bin/env python3
 # agy-harness: ファイル編集ガード (PreToolUse)
-# 1) ファイル削除ツールは /tmp 配下の安全な具体パスを除き force_ask (暗黙のデータ破棄対策)
-# 2) テストファイルへの編集に「テストを都合よく通すためのパターン」を検出したら ask
+# 1) ファイル削除ツールは /tmp・$TMPDIR・scratch・アクティブ workspacePaths 配下の安全対象のみ allow、
+#    それ以外（ワークスペース外・保護対象・シンボリックリンク等）は非ブロッキング deny ([DEFER_HUMAN_GATE])
+# 2) テストファイルへの編集に「テストを都合よく通すためのパターン」を検出したら deny ([DEFER_HUMAN_GATE])
 import json
 import os
 import re
 import sys
 
-FORBIDDEN_TMP_CHARS = frozenset("$`\n\r\x00~*?[]{}()\\|;&<>")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+from _workspace_guard import (
+    FORBIDDEN_WS_CHARS,
+    SCRATCH_ROOT_RE,
+    is_safe_scratch_target,
+    is_safe_tmp_target,
+    is_safe_workspace_target,
+    is_valid_env_tmpdir,
+    normalize_safe_workspace_roots,
+    strip_leading_dotslash,
+    validate_initial_cwd_in_workspace,
+    validate_rel_subpath_under_root,
+    validate_workspace_rel_subpath,
+    ws_relpath,
+)
+
 PATH_KEY_RE = re.compile(r"(path|file|target|dir|uri|dest|source|src)", re.IGNORECASE)
 SAFE_DELETE_META_KEYS = frozenset({"toolsummary", "description", "reason", "summary"})
+DEFER_DELETE_DENY_MSG = (
+    "[DEFER_HUMAN_GATE] ワークスペース外・保護対象（.git/.env/ルート等）・または安全性未確認のファイル削除のため自動実行を拒否しました。"
+    "ここで停止・回避工作せず、この削除操作はスキップして残りのゴール作業を進め、"
+    "最終報告の「Human Gate（手動確認・実行依頼）」セクションに対象パスと理由をまとめて提示してください（pending_human_review）。"
+    "ユーザーが次ターンで削除を明示承認した場合は再実行して構いません（Human Gate フックが承認を自動検証します）。"
+)
 
 
 def emit(obj):
@@ -17,40 +41,39 @@ def emit(obj):
     sys.exit(0)
 
 
-def _is_safe_tmp_path(raw_path: str | None) -> bool:
-    if not raw_path or any(c in FORBIDDEN_TMP_CHARS for c in raw_path):
+def _is_safe_delete_target(
+    raw_path: str | None,
+    ws_roots: list[tuple[str, str]],
+    cwd_pair: tuple[str, str] | None,
+    env_tmpdir: str,
+    env_tmpdir_valid: bool,
+) -> bool:
+    """Return True iff raw_path is a concrete safe path under /tmp, $TMPDIR, scratch, or active workspace."""
+    if not raw_path or any(c in FORBIDDEN_WS_CHARS for c in raw_path):
         return False
-    if not (raw_path.startswith("/tmp/") or raw_path.startswith("/private/tmp/")):
+    if is_safe_tmp_target(raw_path):
+        return True
+    if env_tmpdir_valid and env_tmpdir and raw_path.startswith(env_tmpdir + "/"):
+        if validate_rel_subpath_under_root(env_tmpdir, raw_path[len(env_tmpdir) + 1 :], allow_glob=False):
+            return True
+    m_scr = SCRATCH_ROOT_RE.match(raw_path)
+    if m_scr and m_scr.group(2) and is_safe_scratch_target(m_scr.group(1), m_scr.group(2)):
+        return True
+    if raw_path.startswith("/"):
+        return bool(
+            ws_roots and is_safe_workspace_target(raw_path, ws_roots, allow_glob=False, check_protected_anchors=True)
+        )
+    if cwd_pair is None or raw_path.startswith(("~", "-", "$")) or raw_path in (".", "./"):
         return False
-    parts = [p for p in raw_path.split("/") if p != ""]
-    if "." in parts or ".." in parts:
+    clean = strip_leading_dotslash(raw_path)
+    if not clean:
         return False
-    if parts[0] == "tmp":
-        if len(parts) < 2:
-            return False
-        root_prefix = "/tmp"
-        sub_parts = parts[1:]
-    elif len(parts) >= 3 and parts[0] == "private" and parts[1] == "tmp":
-        root_prefix = "/private/tmp"
-        sub_parts = parts[2:]
-    else:
+    ws_real, cwd_real = cwd_pair
+    base_rel = ws_relpath(cwd_real, ws_real)
+    if base_rel is None:
         return False
-
-    tmp_root_real = os.path.realpath("/tmp")
-    deepest_existing = root_prefix
-    cur = root_prefix
-    for part in sub_parts:
-        cur = cur + "/" + part
-        if os.path.islink(cur):
-            return False
-        if os.path.exists(cur):
-            deepest_existing = cur
-
-    if os.path.exists(deepest_existing):
-        real_anc = os.path.realpath(deepest_existing)
-        if real_anc != tmp_root_real and not real_anc.startswith(tmp_root_real + os.sep):
-            return False
-    return True
+    full_rel = f"{base_rel}/{clean}" if base_rel else clean
+    return validate_workspace_rel_subpath(ws_real, full_rel, allow_glob=False, check_protected_anchors=True)
 
 
 def _extract_delete_targets(args: dict) -> list[str] | None:
@@ -88,19 +111,40 @@ try:
     payload = json.load(sys.stdin)
     tool_name = str(payload.get("toolCall", {}).get("name", ""))
     tool_args = payload.get("toolCall", {}).get("args", {})
+    raw_ws_paths = payload.get("workspacePaths")
+    ws_roots = normalize_safe_workspace_roots(raw_ws_paths)
+    initial_cwd = str(payload.get("cwd") or "")
 except Exception:
     emit({"decision": "allow"})
 
 if not isinstance(tool_args, dict):
     emit({"decision": "allow"})
 
-# --- ファイル削除は /tmp 配下の安全な具体パスのみ allow、それ以外はすべて force_ask ---
+# --- ファイル削除は /tmp・$TMPDIR・scratch・アクティブ workspacePaths 配下の安全対象のみ allow、他は非ブロッキング deny ---
 if re.search(r"delete|remove", tool_name, re.IGNORECASE):
     del_targets = _extract_delete_targets(tool_args)
-    if del_targets and all(_is_safe_tmp_path(t) for t in del_targets):
+    raw_env_tmpdir = os.environ.get("TMPDIR", "").rstrip("/")
+    env_tmpdir_valid = is_valid_env_tmpdir(raw_env_tmpdir)
+    cwd_pair = validate_initial_cwd_in_workspace(initial_cwd, ws_roots)
+    if del_targets and all(
+        _is_safe_delete_target(t, ws_roots, cwd_pair, raw_env_tmpdir, env_tmpdir_valid)
+        for t in del_targets
+    ):
         emit({"decision": "allow"})
-    emit({"decision": "force_ask",
-          "reason": "ファイル削除です。対象がユーザー資産・生成物・一時ファイルのいずれか、復元手段の有無を確認してください。"})
+    if del_targets:
+        from _human_gate_decision import evaluate_human_gate_override
+
+        override = evaluate_human_gate_override(
+            payload,
+            tool_name or "delete_file",
+            json.dumps(del_targets, ensure_ascii=False),
+            DEFER_DELETE_DENY_MSG,
+            catastrophic_check_text="\n".join(del_targets),
+            catastrophic_paths_only=True,
+        )
+        if override is not None:
+            emit(override)
+    emit({"decision": "deny", "reason": DEFER_DELETE_DENY_MSG})
 
 strings = []
 
@@ -160,9 +204,24 @@ for pattern, name in PATTERNS:
             hits.append(name)
 
 if hits:
-    emit({"decision": "ask",
-          "reason": ("テストファイルへの編集に要注意パターンを検出: " + " / ".join(hits)
-                     + "。テストを通すためのテスト側改変は禁止です。最適解はアプリケーションコード側の修正。"
-                       "期待値は仕様から導出し、意図的な skip 等は理由をユーザーに説明してください。")})
+    test_defer_reason = (
+        "[DEFER_HUMAN_GATE] テストファイルへの編集に要注意パターンを検出: " + " / ".join(hits)
+        + "。テストを通すためのテスト側改変は禁止です。最適解はアプリケーションコード側の修正です。"
+          "どうしても意図的な skip 等が必要な場合のみここで停止せず該当編集をスキップし、最終報告の「Human Gate（手動確認・実行依頼）」へ理由を提示してください（pending_human_review）。"
+          "ユーザーが次ターンで編集を明示承認した場合は再実行して構いません（Human Gate フックが承認を自動検証します）。"
+    )
+    from _human_gate_decision import evaluate_human_gate_override
+
+    override = evaluate_human_gate_override(
+        payload,
+        tool_name or "edit_file",
+        json.dumps({"path": path, "hits": hits, "tool_args": tool_args}, ensure_ascii=False),
+        test_defer_reason,
+        catastrophic_check_text=path,
+        catastrophic_paths_only=True,
+    )
+    if override is not None:
+        emit(override)
+    emit({"decision": "deny", "reason": test_defer_reason})
 
 emit({"decision": "allow"})
